@@ -123,6 +123,27 @@ export interface ActionsSummary {
   low_level: LowLevelAction[];
   high_level: HighLevelAction[];
   observations: ObservationType[];
+  transcript_summaries?: TranscriptActionsSummary[];
+  current_transcript_idx?: number | null;
+  total_transcripts?: number;
+}
+
+export type TranscriptActionsSummaryStatus =
+  | 'pending'
+  | 'running'
+  | 'complete'
+  | 'error';
+
+export interface TranscriptActionsSummary {
+  transcript_id: string;
+  transcript_idx: number;
+  transcript_name: string | null;
+  transcript_group_id: string | null;
+  low_level: LowLevelAction[];
+  high_level: HighLevelAction[];
+  observations: ObservationType[];
+  status: TranscriptActionsSummaryStatus;
+  error?: string;
 }
 
 export interface LowLevelAction {

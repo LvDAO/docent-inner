@@ -7,6 +7,8 @@ services:
       context: .
       dockerfile: Dockerfile.backend
     container_name: docent_backend
+    env_file:
+      - .env
     ports:
       - "${DOCENT_SERVER_PORT:-8888}:${DOCENT_SERVER_PORT:-8888}"
     depends_on:
@@ -29,6 +31,8 @@ services:
       context: .
       dockerfile: Dockerfile.backend
     container_name: docent_worker
+    env_file:
+      - .env
     depends_on:
       - postgres
       - redis

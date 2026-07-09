@@ -103,14 +103,7 @@ export const getActionsSummary = createAsyncThunk(
         `/rest/${collectionId}/actions_summary?agent_run_id=${agentRunId}`,
         (data) => {
           // Update actions summary with streamed data
-          dispatch(
-            setActionsSummary({
-              agent_run_id: data.agent_run_id,
-              low_level: data.low_level,
-              high_level: data.high_level,
-              observations: data.observations,
-            })
-          );
+          dispatch(setActionsSummary(data as ActionsSummary));
         },
         () => {
           dispatch(onFinishLoadingActionsSummary());

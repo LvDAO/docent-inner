@@ -10,7 +10,7 @@ Each LLM provider is specified through a [`ProviderConfig`][docent_core._llm_uti
 - `single_output_getter`: Gets a single completion from the provider, compatible with the [`AsyncSingleOutputGetter`][docent_core._llm_util.providers.registry.SingleOutputGetter] protocol
 - `single_streaming_output_getter`: Gets a streaming completion from the provider, compatible with the [`AsyncSingleStreamingOutputGetter`][docent_core._llm_util.providers.registry.SingleStreamingOutputGetter] protocol
 
-We currently support `anthropic`, `openai`, and `azure_openai`.
+Docent defaults to `deepseek`. It also includes a `custom` provider for OpenAI-compatible chat-completions endpoints that can be configured with a base URL and API key.
 
 #### Adding a new provider
 
@@ -20,7 +20,43 @@ We currently support `anthropic`, `openai`, and `azure_openai`.
 
 ### Selecting models for Docent functions
 
-Docent uses a preference system to determine which LLM models to use for different functions. [`ProviderPreferences`][docent_core._llm_util.providers.preferences.ProviderPreferences] manages the mapping between Docent functions and their ordered preference of [`ModelOption`][docent_core._llm_util.providers.preferences.ModelOption] objects:
+Docent uses a preference system to determine which LLM models to use for different functions. [`ProviderPreferences`][docent_core._llm_util.providers.preferences.ProviderPreferences] manages the mapping between Docent functions and their ordered preference of [`ModelOption`][docent_core._llm_util.providers.preferences.ModelOption] objects.
+
+For self-hosted deployments, prefer the environment-variable interface. It does not require code edits:
+
+```bash
+DOCENT_LLM_PROVIDER=deepseek
+DOCENT_LLM_BASE_URL=https://api.deepseek.com
+DOCENT_LLM_API_KEY=...
+DOCENT_LLM_FLASH_MODEL=deepseek-v4-flash
+DOCENT_LLM_PRO_MODEL=deepseek-v4-pro
+```
+
+To use a custom OpenAI-compatible endpoint:
+
+```bash
+DOCENT_LLM_PROVIDER=custom
+DOCENT_LLM_BASE_URL=https://your-provider.example/v1
+DOCENT_LLM_API_KEY=...
+DOCENT_LLM_FLASH_MODEL=fast-model-name
+DOCENT_LLM_PRO_MODEL=strong-model-name
+```
+
+Per-feature overrides let you route expensive or sensitive tasks to different models:
+
+```bash
+DOCENT_LLM_CHAT_MODEL=chat-model-name
+DOCENT_LLM_JUDGE_MODEL=judge-model-name
+DOCENT_LLM_SUMMARIZE_AGENT_ACTIONS_MODEL=fast-summary-model-name
+DOCENT_LLM_OBSERVATIONS_MODEL=observation-model-name
+DOCENT_LLM_SEARCH_MODEL=search-model-name
+DOCENT_LLM_REFINE_MODEL=refinement-model-name
+DOCENT_LLM_CLUSTER_MODEL=cluster-model-name
+```
+
+Leave a per-feature variable blank to inherit `DOCENT_LLM_FLASH_MODEL` or `DOCENT_LLM_PRO_MODEL`, depending on the task. See [environment variables](./environment_variables.md#llm-calls) for the full list.
+
+For source-level customization, edit `ProviderPreferences` directly:
 
 ```python
 @cached_property
@@ -32,13 +68,8 @@ def function_name(self) -> list[ModelOption]:
     """
     return [
         ModelOption(
-            provider="anthropic",
-            model_name="claude-sonnet-4-20250514",
-            reasoning_effort="medium"  # only for reasoning models
-        ),
-        ModelOption(
-            provider="openai",
-            model_name="o1",
+            provider="custom",
+            model_name="my-model",
             reasoning_effort="medium"
         ),
     ]

@@ -70,6 +70,10 @@ export default function AgentRunPage() {
     }
   }, [citationNav]);
 
+  if (!curAgentRunId) {
+    return null;
+  }
+
   return (
     <Suspense>
       {/* Transcript */}
