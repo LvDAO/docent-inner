@@ -21,6 +21,7 @@ import {
 } from '@/providers/use-refinement-tab';
 import { TextSelectionProvider } from '@/providers/use-text-selection';
 import { useAppSelector } from '@/app/store/hooks';
+import { useLocale } from '@/app/contexts/LocaleContext';
 
 interface RubricLayoutBodyProps {
   collectionId: string;
@@ -33,6 +34,7 @@ function RubricLayoutBody({
   rubricId,
   children,
 }: RubricLayoutBodyProps) {
+  const { t } = useLocale();
   const { result_id: resultId } = useParams<{ result_id?: string }>();
   const isOnResultRoute = !!resultId;
 
@@ -158,12 +160,14 @@ function RubricLayoutBody({
             >
               {isOnResultRoute && (
                 <TabsList className="grid grid-cols-3 justify-start w-full mb-2">
-                  <TabsTrigger value="refine">Refine</TabsTrigger>
+                  <TabsTrigger value="refine">
+                    {t('misc.rubric.refine')}
+                  </TabsTrigger>
                   <TabsTrigger value="analyze" disabled={!isOnResultRoute}>
-                    Analyze
+                    {t('misc.rubric.analyze')}
                   </TabsTrigger>
                   <TabsTrigger value="label" disabled={!isOnResultRoute}>
-                    Label
+                    {t('misc.rubric.label')}
                   </TabsTrigger>
                 </TabsList>
               )}
@@ -197,7 +201,7 @@ function RubricLayoutBody({
                   />
                 ) : (
                   <div className="text-xs text-muted-foreground p-2">
-                    Open a result to edit labels.
+                    {t('misc.rubric.openResultToEditLabels')}
                   </div>
                 )}
               </TabsContent>

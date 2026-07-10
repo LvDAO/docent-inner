@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
+import { useLocale } from '@/app/contexts/LocaleContext';
 import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 
 interface SortControlsProps {
@@ -25,6 +26,7 @@ export const SortControls = ({
   sortDirection,
   onSortChange,
 }: SortControlsProps) => {
+  const { t } = useLocale();
   const collectionId = useSelector(
     (state: RootState) => state.collection.collectionId
   );
@@ -38,9 +40,9 @@ export const SortControls = ({
 
   const sortableFields = sortableFieldsData?.fields || [];
 
-  // Always show "No sorting" option, even when data is loading
+  // Keep the sentinel option visible while sortable fields are loading.
   const allOptions = [
-    { name: 'none', displayName: 'No sorting' },
+    { name: 'none', displayName: t('misc.sort.none') },
     ...sortableFields.map((field) => ({
       name: field.name,
       displayName: field.name,
@@ -66,7 +68,7 @@ export const SortControls = ({
       <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
       <Select value={sortField || 'none'} onValueChange={handleFieldChange}>
         <SelectTrigger className="h-7 text-xs bg-background font-mono text-muted-foreground w-48">
-          <SelectValue placeholder="Select field" />
+          <SelectValue placeholder={t('misc.sort.selectField')} />
         </SelectTrigger>
         <SelectContent>
           {allOptions.map((option) => (
@@ -88,7 +90,9 @@ export const SortControls = ({
           onClick={handleDirectionChange}
           className="h-7 text-xs bg-background font-mono text-muted-foreground border-border hover:bg-muted-foreground/10 flex items-center gap-1 px-2 w-16"
         >
-          {sortDirection === 'asc' ? 'asc' : 'desc'}
+          {sortDirection === 'asc'
+            ? t('misc.sort.ascending')
+            : t('misc.sort.descending')}
           {sortDirection === 'asc' ? (
             <ArrowUp className="h-3 w-3" />
           ) : (

@@ -10,10 +10,12 @@ import {
 } from '../../../api/rubricApi';
 import { useCreateOrGetRefinementSessionMutation } from '../../../api/refinementApi';
 import { toast } from '@/hooks/use-toast';
+import { useLocale } from '@/app/contexts/LocaleContext';
 import QuickSearchBox from './QuickSearchBox';
 
 const RubricArea = () => {
   const router = useRouter();
+  const { t } = useLocale();
   const { collection_id: collectionId } = useParams<{
     collection_id: string;
   }>();
@@ -39,8 +41,8 @@ const RubricArea = () => {
       .catch((error) => {
         console.error('Failed to create rubric', error);
         toast({
-          title: 'Error',
-          description: 'Failed to create rubric',
+          title: t('results.error.title'),
+          description: t('results.rubric.createFailed'),
           variant: 'destructive',
         });
       });
@@ -62,8 +64,8 @@ const RubricArea = () => {
       .catch((error) => {
         console.error('Failed to create or get session:', error);
         toast({
-          title: 'Error',
-          description: 'Failed to create or get session',
+          title: t('results.error.title'),
+          description: t('results.rubric.sessionFailed'),
           variant: 'destructive',
         });
       });
@@ -79,8 +81,8 @@ const RubricArea = () => {
     }).catch((error) => {
       console.error('Failed to start full search:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to start full search',
+        title: t('results.error.title'),
+        description: t('results.rubric.searchFailed'),
         variant: 'destructive',
       });
     });
@@ -96,8 +98,8 @@ const RubricArea = () => {
       .catch((error) => {
         console.error('Failed to create or get session:', error);
         toast({
-          title: 'Error',
-          description: 'Failed to create or get session',
+          title: t('results.error.title'),
+          description: t('results.rubric.sessionFailed'),
           variant: 'destructive',
         });
       });

@@ -1,5 +1,11 @@
+from collections.abc import AsyncIterator
+
 from fastapi import Depends, HTTPException, Request
 
+from docent_core._llm_util.localization import (
+    get_user_preferred_locale,
+    response_locale_context,
+)
 from docent_core.docent.db.schemas.auth_models import User
 from docent_core.docent.server.dependencies.database import get_mono_svc
 from docent_core.docent.services.monoservice import MonoService
@@ -21,7 +27,9 @@ async def _get_user_from_request(request: Request, mono_svc: MonoService):
     return None
 
 
-async def get_authenticated_user(request: Request, db: MonoService = Depends(get_mono_svc)) -> User:
+async def get_authenticated_user(
+    request: Request, db: MonoService = Depends(get_mono_svc)
+) -> AsyncIterator[User]:
     """Get the authenticated user from the request.
     Requires that the user is NOT anonymous."""
 
@@ -29,12 +37,13 @@ async def get_authenticated_user(request: Request, db: MonoService = Depends(get
     if user is None or user.is_anonymous:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    return user
+    with response_locale_context(get_user_preferred_locale(user)):
+        yield user
 
 
 async def get_user_anonymous_ok(
     request: Request, mono_svc: MonoService = Depends(get_mono_svc)
-) -> User:
+) -> AsyncIterator[User]:
     """Get the user from the request.
     It's fine if the user is anonymous.
     """
@@ -43,7 +52,8 @@ async def get_user_anonymous_ok(
     if user is None:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    return user
+    with response_locale_context(get_user_preferred_locale(user)):
+        yield user
 
 
 async def get_default_view_ctx(
@@ -51,4 +61,7 @@ async def get_default_view_ctx(
     mono_svc: MonoService = Depends(get_mono_svc),
     user: User = Depends(get_user_anonymous_ok),
 ):
-    return await mono_svc.get_default_view_ctx(collection_id, user)
+    ctx = await mono_svc.get_default_view_ctx(collection_id, user)
+    # Keep the locale active through the full response, including streaming bodies.
+    with response_locale_context(get_user_preferred_locale(user)):
+        yield ctx

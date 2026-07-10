@@ -1,5 +1,7 @@
 import { Loader2 } from 'lucide-react';
 
+import { useLocale } from '../contexts/LocaleContext';
+
 interface ProgressBarProps {
   current: number;
   total: number | null;
@@ -11,11 +13,13 @@ export const ProgressBar = ({
   total,
   paused = false,
 }: ProgressBarProps) => {
+  const { t } = useLocale();
+
   return (
     <div className="mt-2 mb-2 space-y-1">
       <div className="flex justify-between text-xs text-muted-foreground">
         <span className="flex items-center">
-          Processing...
+          {t('workspace.progress.processing')}
           {!paused && (
             <Loader2
               size={12}

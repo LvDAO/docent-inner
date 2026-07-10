@@ -22,6 +22,7 @@ import { FilterChips } from './FilterChips';
 import { SmartValueInput } from './SmartValueInput';
 import { Combobox } from './Combobox';
 import { StepFilter } from './StepFilter';
+import { useLocale } from '../contexts/LocaleContext';
 
 export const toggleFilterDisabledState = (
   filterGroup: ComplexFilter | null,
@@ -75,6 +76,7 @@ export const FilterControls = ({
   showStepFilter = true,
   initialFilter = null,
 }: FilterControlsProps) => {
+  const { t } = useLocale();
   const [metadataKey, setMetadataKey] = useState('');
   const [metadataValue, setMetadataValue] = useState('');
   const [metadataType, setMetadataType] = useState<MetadataType | undefined>(
@@ -125,8 +127,8 @@ export const FilterControls = ({
   const onUpdateMetadataFilter = (value: string) => {
     if (!metadataKey.trim()) {
       toast({
-        title: 'Missing key',
-        description: 'Please enter a metadata key',
+        title: t('charts.filter.missingKey'),
+        description: t('charts.filter.enterMetadataKey'),
         variant: 'destructive',
       });
       return;
@@ -146,8 +148,8 @@ export const FilterControls = ({
         parsedValue = Number(value);
         if (isNaN(parsedValue)) {
           toast({
-            title: 'Invalid number',
-            description: 'Please enter a valid number',
+            title: t('charts.filter.invalidNumber'),
+            description: t('charts.filter.enterValidNumber'),
             variant: 'destructive',
           });
           return;
@@ -348,7 +350,7 @@ export const FilterControls = ({
       <div className="grid grid-cols-[1fr_auto_1fr_auto] gap-1.5">
         <div>
           <div className="text-xs text-muted-foreground font-mono ml-1 mb-1">
-            Filter by
+            {t('charts.filter.filterBy')}
           </div>
           <Combobox
             value={metadataKey || null}
@@ -357,9 +359,9 @@ export const FilterControls = ({
               value: field.name,
               label: field.name,
             }))}
-            placeholder="Select field"
-            searchPlaceholder="Search fields..."
-            emptyMessage="No fields found."
+            placeholder={t('charts.filter.selectField')}
+            searchPlaceholder={t('charts.filter.searchFields')}
+            emptyMessage={t('charts.filter.noFieldsFound')}
             triggerClassName="w-full justify-between bg-background font-mono text-muted-foreground"
             commandInputClassName="h-8 text-xs"
             commandListClassName="custom-scrollbar"
@@ -373,7 +375,7 @@ export const FilterControls = ({
         {metadataType === 'int' || metadataType === 'float' ? (
           <div>
             <div className="text-xs text-muted-foreground font-mono mr-1 mb-1">
-              Operator
+              {t('charts.filter.operator')}
             </div>
             <Select value={metadataOp} onValueChange={handleOperatorChange}>
               <SelectTrigger className="h-7 text-xs bg-background font-mono text-muted-foreground w-16 hover:bg-secondary hover:text-primary">
@@ -404,7 +406,7 @@ export const FilterControls = ({
         ) : (
           <div>
             <div className="text-xs text-muted-foreground font-mono mr-1 mb-1">
-              Operator
+              {t('charts.filter.operator')}
             </div>
             <Select value={metadataOp} onValueChange={handleOperatorChange}>
               <SelectTrigger className="h-7 text-xs bg-background font-mono text-muted-foreground w-16 hover:bg-secondary hover:text-primary">
@@ -428,7 +430,9 @@ export const FilterControls = ({
         )}
         <div>
           <div className="text-xs text-muted-foreground font-mono ml-1 mb-1">
-            Value{metadataType ? ` (${metadataType})` : ''}
+            {metadataType
+              ? t('charts.filter.valueWithType', { type: metadataType })
+              : t('charts.filter.value')}
           </div>
           {metadataType === 'bool' ? (
             <Select
@@ -436,7 +440,7 @@ export const FilterControls = ({
               onValueChange={onUpdateMetadataFilter}
             >
               <SelectTrigger className="h-7 text-xs bg-background font-mono text-muted-foreground hover:bg-secondary hover:text-primary">
-                <SelectValue placeholder="Select value" />
+                <SelectValue placeholder={t('charts.filter.selectValue')} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="true" className="font-mono text-xs">
@@ -455,14 +459,18 @@ export const FilterControls = ({
               value={metadataValue}
               onValueChange={setMetadataValue}
               onEnter={() => onUpdateMetadataFilter(metadataValue)}
-              placeholder="Enter value..."
+              placeholder={t('charts.filter.enterValueEllipsis')}
             />
           ) : (
             <Input
               ref={valueFieldRef}
               value={metadataValue}
               onChange={(e) => setMetadataValue(e.target.value)}
-              placeholder={metadataType === 'int' ? 'e.g. 42' : 'e.g. value'}
+              placeholder={
+                metadataType === 'int'
+                  ? t('charts.filter.exampleNumber')
+                  : t('charts.filter.exampleValue')
+              }
               type={metadataType === 'int' ? 'number' : 'text'}
               className="h-7 text-xs bg-background font-mono text-muted-foreground hover:bg-secondary hover:text-primary"
               onKeyDown={(e) => {
@@ -486,7 +494,7 @@ export const FilterControls = ({
             className="h-7 text-xs whitespace-nowrap px-2"
             size="sm"
           >
-            Add Filter
+            {t('charts.filter.add')}
           </Button>
         </div>
       </div>

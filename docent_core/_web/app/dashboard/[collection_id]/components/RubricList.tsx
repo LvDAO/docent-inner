@@ -23,6 +23,7 @@ import {
 import { useGetCollectionsQuery } from '@/app/api/collectionApi';
 import { toast } from '@/hooks/use-toast';
 import { useHasCollectionWritePermission } from '@/lib/permissions/hooks';
+import { useLocale } from '@/app/contexts/LocaleContext';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,6 +50,7 @@ function RubricCard({
   hasWritePermission,
 }: RubricCardProps) {
   const router = useRouter();
+  const { t } = useLocale();
   const [createOrGetRefinementSession] =
     useCreateOrGetRefinementSessionMutation();
 
@@ -78,14 +80,16 @@ function RubricCard({
         (c) => c.id === targetCollectionId
       );
       toast({
-        title: 'Rubric Copied',
-        description: `Rubric copied to ${targetCollection?.name || targetCollectionId}`,
+        title: t('analysis.rubric.copied'),
+        description: t('analysis.rubric.copiedTo', {
+          collection: targetCollection?.name || targetCollectionId,
+        }),
       });
     } catch (error) {
       console.error('Failed to copy rubric:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to copy rubric',
+        title: t('common.error'),
+        description: t('analysis.rubric.copyFailed'),
         variant: 'destructive',
       });
     }
@@ -101,8 +105,8 @@ function RubricCard({
     } catch (error) {
       console.error('Failed to cancel job:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to cancel job',
+        title: t('common.error'),
+        description: t('analysis.rubric.cancelFailed'),
         variant: 'destructive',
       });
     }
@@ -121,8 +125,8 @@ function RubricCard({
     } catch (error) {
       console.error('Failed to delete rubric:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to delete rubric',
+        title: t('common.error'),
+        description: t('analysis.rubric.deleteFailed'),
         variant: 'destructive',
       });
     }
@@ -150,8 +154,8 @@ function RubricCard({
     } catch (error) {
       console.error('Failed to start refinement session:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to start refinement session',
+        title: t('common.error'),
+        description: t('analysis.rubric.refinementFailed'),
         variant: 'destructive',
       });
     }
@@ -172,7 +176,7 @@ function RubricCard({
           <div className="flex-1 min-w-0">
             {!rubric.rubric_text || rubric.rubric_text.trim() === '' ? (
               <p className="text-xs font-mono text-muted-foreground line-clamp-2">
-                Empty rubric
+                {t('analysis.rubric.empty')}
               </p>
             ) : (
               <p className="text-xs font-mono text-primary line-clamp-2">
@@ -195,7 +199,7 @@ function RubricCard({
                   <button
                     className="p-1.5 rounded transition-colors hover:bg-secondary text-muted-foreground hover:text-primary"
                     onClick={(e) => e.stopPropagation()}
-                    aria-label="Copy this rubric to another collection"
+                    aria-label={t('analysis.rubric.copyToCollection')}
                     disabled={isCopyingRubric}
                   >
                     <ClipboardCopyIcon className="h-3 w-3" />
@@ -203,7 +207,7 @@ function RubricCard({
                 </DropdownMenuTrigger>
               </TooltipTrigger>
               <TooltipContent side="top">
-                Copy this rubric to another collection
+                {t('analysis.rubric.copyToCollection')}
               </TooltipContent>
             </Tooltip>
             <DropdownMenuContent
@@ -212,7 +216,7 @@ function RubricCard({
               onClick={(event) => event.stopPropagation()}
             >
               <DropdownMenuLabel className="text-xs">
-                Select a collection to copy into
+                {t('analysis.rubric.selectCopyCollection')}
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               {copyableCollections.map((collection) => (
@@ -227,9 +231,13 @@ function RubricCard({
                   <div className="flex flex-col">
                     <span
                       className="font-medium block max-w-[14rem] truncate"
-                      title={collection.name || 'Unnamed Collection'}
+                      title={
+                        collection.name ||
+                        t('analysis.rubric.unnamedCollection')
+                      }
                     >
-                      {collection.name || 'Unnamed Collection'}
+                      {collection.name ||
+                        t('analysis.rubric.unnamedCollection')}
                     </span>
                     <span className="text-muted-foreground font-mono text-xs">
                       {collection.id.split('-')[0]}
@@ -262,8 +270,8 @@ function RubricCard({
               }}
               aria-label={
                 hasActiveJob
-                  ? "Cancel this rubric's evaluation job"
-                  : 'Run an evaluation with this rubric'
+                  ? t('analysis.rubric.cancelEvaluation')
+                  : t('analysis.rubric.runEvaluation')
               }
               disabled={isCancellingJob}
             >
@@ -276,8 +284,8 @@ function RubricCard({
           </TooltipTrigger>
           <TooltipContent side="top">
             {hasActiveJob
-              ? "Cancel this rubric's evaluation job"
-              : 'Run an evaluation with this rubric'}
+              ? t('analysis.rubric.cancelEvaluation')
+              : t('analysis.rubric.runEvaluation')}
           </TooltipContent>
         </Tooltip>
         {hasWritePermission && (
@@ -289,13 +297,15 @@ function RubricCard({
                   e.stopPropagation();
                   handleDelete(rubric.id);
                 }}
-                aria-label="Delete this rubric"
+                aria-label={t('analysis.rubric.delete')}
                 disabled={isDeletingRubric}
               >
                 <Trash2 className="h-3 w-3" />
               </button>
             </TooltipTrigger>
-            <TooltipContent side="top">Delete this rubric</TooltipContent>
+            <TooltipContent side="top">
+              {t('analysis.rubric.delete')}
+            </TooltipContent>
           </Tooltip>
         )}
       </div>
@@ -304,6 +314,7 @@ function RubricCard({
 }
 
 export default function RubricList() {
+  const { t } = useLocale();
   const params = useParams();
   const collectionId = useAppSelector((state) => state.collection.collectionId);
   const effectiveCollectionId =
@@ -325,9 +336,11 @@ export default function RubricList() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex flex-col">
-          <div className="text-sm font-semibold">Saved Rubrics</div>
+          <div className="text-sm font-semibold">
+            {t('analysis.rubric.saved')}
+          </div>
           <div className="text-xs text-muted-foreground">
-            Run and modify previously-created rubrics
+            {t('analysis.rubric.savedDescription')}
           </div>
         </div>
       </div>
@@ -344,7 +357,7 @@ export default function RubricList() {
           </div>
         ) : rubrics?.length === 0 ? (
           <div className="text-xs text-muted-foreground text-center py-4">
-            No rubrics created yet
+            {t('analysis.rubric.none')}
           </div>
         ) : (
           rubrics?.map((rubric) => (

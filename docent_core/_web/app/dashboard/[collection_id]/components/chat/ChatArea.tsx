@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { ChatMessage } from '@/app/types/transcriptTypes';
 import { ChatMessage as ChatMessageComponent } from './ChatMessage';
 import InputArea from './InputArea';
+import { useLocale } from '@/app/contexts/LocaleContext';
 
 export type SuggestedMessage = string | { label: string; message: string };
 
@@ -46,8 +47,8 @@ export function ChatArea({
   scrollContainerClassName,
   inputAreaClassName,
 }: ChatAreaProps) {
+  const { t } = useLocale();
   const {
-    isAtBottom,
     containerRef,
     endRef,
     onViewportEnter,
@@ -97,7 +98,7 @@ export function ChatArea({
           key="thinking-spacer"
           message={{
             role: 'assistant',
-            content: 'Thinking...',
+            content: t('chat.thinking'),
           }}
           isLoadingPlaceholder={true}
           isStreaming={true}
@@ -106,7 +107,7 @@ export function ChatArea({
       );
     }
     return ans;
-  }, [messages, showThinkingSpacer, isSendingMessage, streamingMessageIdx]);
+  }, [messages, showThinkingSpacer, isSendingMessage, streamingMessageIdx, t]);
 
   // Auto-scroll when the thinking spacer first appears in the message history (i.e., upon send)
   const lastMessageIsThinkingSpacer = useMemo(() => {

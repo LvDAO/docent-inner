@@ -40,10 +40,12 @@ from docent_core._server._broker.redis_client import enqueue_job
 from docent_core.docent.db.contexts import ViewContext
 from docent_core.docent.db.filters import ComplexFilter
 from docent_core.docent.db.schemas.auth_models import (
+    DEFAULT_PREFERRED_LOCALE,
     PERMISSION_LEVELS,
     Permission,
     ResourceType,
     SubjectType,
+    SupportedLocale,
     User,
 )
 from docent_core.docent.db.schemas.chart import SQLAChart
@@ -1376,7 +1378,12 @@ class MonoService:
 
             return [user.to_user() for user in sqla_users]
 
-    async def create_user(self, email: str, password: str) -> User:
+    async def create_user(
+        self,
+        email: str,
+        password: str,
+        preferred_locale: SupportedLocale = DEFAULT_PREFERRED_LOCALE,
+    ) -> User:
         """
         Create a new user. Raises an error if a user with the given email already exists.
 
@@ -1393,7 +1400,11 @@ class MonoService:
             raise ValueError("User already exists for {email}")
 
         user_id = str(uuid4())
-        sqla_user = SQLAUser(id=user_id, email=email)
+        sqla_user = SQLAUser(
+            id=user_id,
+            email=email,
+            preferred_locale=preferred_locale,
+        )
         sqla_user.is_anonymous = False
 
         sqla_user.password_hash = pwd_context.hash(password)
@@ -1419,7 +1430,11 @@ class MonoService:
         # Persist anonymous user to database
         async with self.db.session() as session:
             sqla_user = SQLAUser(
-                id=user_id, email=email, password_hash="not necessary", is_anonymous=True
+                id=user_id,
+                email=email,
+                password_hash="not necessary",
+                is_anonymous=True,
+                preferred_locale=DEFAULT_PREFERRED_LOCALE,
             )
             session.add(sqla_user)
             # Call to_user() inside the session context
@@ -1445,6 +1460,19 @@ class MonoService:
             if not sqla_user:
                 return None
 
+            return sqla_user.to_user()
+
+    async def update_user_preferred_locale(
+        self, user_id: str, preferred_locale: SupportedLocale
+    ) -> User:
+        """Update and return a user's preferred locale."""
+        async with self.db.session() as session:
+            result = await session.execute(select(SQLAUser).where(SQLAUser.id == user_id))
+            sqla_user = result.scalar_one_or_none()
+            if sqla_user is None:
+                raise ValueError(f"User {user_id} not found")
+
+            sqla_user.preferred_locale = preferred_locale
             return sqla_user.to_user()
 
     async def verify_user_password(self, email: str, password: str) -> User | None:

@@ -20,6 +20,7 @@ import {
   usePreviewImportRunsFromFileMutation,
   useLazyImportRunsFromFileStreamQuery,
 } from '@/app/api/collectionApi';
+import { useLocale } from '../contexts/LocaleContext';
 
 const uploadStates = {
   INACTIVE: 'inactive',
@@ -63,6 +64,7 @@ export default function UploadRunsDialog({
   file,
   onImportSuccess,
 }: UploadRunsDialogProps) {
+  const { t } = useLocale();
   const [uploadState, setUploadState] = useState<UploadState>(
     uploadStates.INACTIVE
   );
@@ -95,7 +97,9 @@ export default function UploadRunsDialog({
 
       if (!hasValidExtension) {
         setError(
-          `Invalid file type. Please upload a file with one of these extensions: ${validExtensions.join(', ')}`
+          t('workspace.upload.invalidFileType', {
+            extensions: validExtensions.join(', '),
+          })
         );
         setUploadState(uploadStates.REVIEWING);
         return;
@@ -112,11 +116,15 @@ export default function UploadRunsDialog({
         setProgressCurrent(0);
         setProgressTotal(response?.would_import?.num_agent_runs ?? null);
       } catch (err: any) {
-        setError(err?.data?.detail || err?.message || 'Preview failed');
+        setError(
+          err?.data?.detail ||
+            err?.message ||
+            t('workspace.upload.previewFailed')
+        );
         setUploadState(uploadStates.REVIEWING);
       }
     },
-    [collection_id, triggerPreview]
+    [collection_id, t, triggerPreview]
   );
 
   // Process file when dialog opens with a file
@@ -147,7 +155,9 @@ export default function UploadRunsDialog({
       await promise.unwrap();
       // unwrap resolves only for immediate queryFn; we rely on SSE updates via updateCachedData below
     } catch (err: any) {
-      setError(err?.data?.detail || err?.message || 'Import failed');
+      setError(
+        err?.data?.detail || err?.message || t('workspace.upload.importFailed')
+      );
       setUploadState(uploadStates.REVIEWING);
     }
   };
@@ -169,17 +179,19 @@ export default function UploadRunsDialog({
     setProgressCurrent(data.uploaded);
     setProgressTotal(data.total);
 
-    if (data.phase === 'complete') {
+    if (data.phase === 'complete' && isOpen) {
       toast({
-        title: 'Runs Imported',
-        description: `${data.uploaded} runs have been imported successfully.`,
+        title: t('workspace.upload.importedTitle'),
+        description: t('workspace.upload.importedDescription', {
+          count: data.uploaded,
+        }),
       });
       if (onImportSuccess) {
         onImportSuccess();
       }
       handleClose();
     }
-  }, [importStreamState.data, handleClose, onImportSuccess]);
+  }, [importStreamState.data, handleClose, isOpen, onImportSuccess, t]);
 
   const showTruncationTooltip =
     previewResult &&
@@ -193,23 +205,33 @@ export default function UploadRunsDialog({
         <DialogHeader>
           {previewResult ? (
             <DialogTitle>
-              Upload &quot;{previewResult.file_info.filename}&quot;
+              {t('workspace.upload.titleWithFilename', {
+                filename: previewResult.file_info.filename,
+              })}
             </DialogTitle>
           ) : (
-            <DialogTitle>Import Inspect Log</DialogTitle>
+            <DialogTitle>{t('workspace.upload.importInspectLog')}</DialogTitle>
           )}
         </DialogHeader>
 
         {uploadState === uploadStates.PROCESSING && (
-          <div className="flex flex-col items-center space-y-2 py-8">
+          <div
+            className="flex flex-col items-center space-y-2 py-8"
+            role="status"
+            aria-live="polite"
+          >
             <Loader2 size={16} className="animate-spin text-muted-foreground" />
             <div className="text-sm text-muted-foreground">
-              Processing file...
+              {t('workspace.upload.processingFile')}
             </div>
           </div>
         )}
 
-        {error && <div className="text-sm text-red-600">Error: {error}</div>}
+        {error && (
+          <div className="text-sm text-red-600" role="alert">
+            {t('workspace.upload.errorPrefix', { error })}
+          </div>
+        )}
         {previewResult && (
           <div className="space-y-4">
             <div className="space-y-4 border rounded-lg p-4">
@@ -217,20 +239,34 @@ export default function UploadRunsDialog({
                 <table className="table-auto w-full text-sm">
                   <tbody>
                     <tr>
-                      <td className="font-bold">Agent Runs</td>
+                      <td className="font-bold">
+                        {t('workspace.upload.agentRuns')}
+                      </td>
                       <td>{previewResult.would_import.num_agent_runs}</td>
                     </tr>
                     <tr>
-                      <td className="font-bold">Task</td>
-                      <td>{previewResult.file_info.task || 'Unknown'}</td>
+                      <td className="font-bold">
+                        {t('workspace.upload.task')}
+                      </td>
+                      <td>
+                        {previewResult.file_info.task ||
+                          t('workspace.upload.unknown')}
+                      </td>
                     </tr>
                     <tr>
-                      <td className="font-bold">Model</td>
-                      <td>{previewResult.file_info.model || 'Unknown'}</td>
+                      <td className="font-bold">
+                        {t('workspace.upload.model')}
+                      </td>
+                      <td>
+                        {previewResult.file_info.model ||
+                          t('workspace.upload.unknown')}
+                      </td>
                     </tr>
                     {previewResult.would_import.score_types.length > 0 && (
                       <tr>
-                        <td className="font-bold">Score Types</td>
+                        <td className="font-bold">
+                          {t('workspace.upload.scoreTypes')}
+                        </td>
                         <td>
                           {previewResult.would_import.score_types.join(', ')}
                         </td>
@@ -244,11 +280,13 @@ export default function UploadRunsDialog({
             {previewResult.sample_preview.length > 0 && (
               <div className="text-sm">
                 <div className="flex items-center justify-between mb-2">
-                  <strong>Run metadata</strong>
+                  <strong>{t('workspace.upload.runMetadata')}</strong>
                   <div className="flex items-center space-x-2">
                     <Button
                       variant="outline"
                       size="sm"
+                      aria-label={t('workspace.upload.previousRun')}
+                      title={t('workspace.upload.previousRun')}
                       onClick={() =>
                         setCurrentSampleIndex(
                           Math.max(0, currentSampleIndex - 1)
@@ -259,8 +297,10 @@ export default function UploadRunsDialog({
                       <ChevronLeft size={16} />
                     </Button>
                     <span className="text-xs text-muted-foreground">
-                      Run {currentSampleIndex + 1} of{' '}
-                      {previewResult.would_import.num_agent_runs}
+                      {t('workspace.upload.runPosition', {
+                        current: currentSampleIndex + 1,
+                        total: previewResult.would_import.num_agent_runs,
+                      })}
                     </span>
                     <Tooltip open={showTruncationTooltip ?? false}>
                       <TooltipTrigger asChild>
@@ -268,6 +308,8 @@ export default function UploadRunsDialog({
                           <Button
                             variant="outline"
                             size="sm"
+                            aria-label={t('workspace.upload.nextRun')}
+                            title={t('workspace.upload.nextRun')}
                             onClick={() =>
                               setCurrentSampleIndex(
                                 Math.min(
@@ -286,8 +328,9 @@ export default function UploadRunsDialog({
                         </div>
                       </TooltipTrigger>
                       <TooltipContent>
-                        Preview only includes the first{' '}
-                        {previewResult.sample_preview.length} runs
+                        {t('workspace.upload.previewLimit', {
+                          count: previewResult.sample_preview.length,
+                        })}
                       </TooltipContent>
                     </Tooltip>
                   </div>
@@ -313,7 +356,15 @@ export default function UploadRunsDialog({
         )}
 
         {uploadState === uploadStates.UPLOADING && (
-          <ProgressBar current={progressCurrent} total={progressTotal} />
+          <div
+            role="progressbar"
+            aria-label={t('workspace.upload.importProgress')}
+            aria-valuemin={0}
+            aria-valuemax={progressTotal ?? undefined}
+            aria-valuenow={progressCurrent}
+          >
+            <ProgressBar current={progressCurrent} total={progressTotal} />
+          </div>
         )}
 
         <DialogFooter>
@@ -331,10 +382,14 @@ export default function UploadRunsDialog({
               {uploadState !== uploadStates.UPLOADING && (
                 <UploadIcon size={16} className="mr-2" />
               )}
-              Import {previewResult?.would_import.num_agent_runs ?? ''} Runs
+              {previewResult
+                ? t('workspace.upload.importRuns', {
+                    count: previewResult.would_import.num_agent_runs,
+                  })
+                : t('workspace.upload.importRunsPending')}
             </Button>
             <Button variant="outline" onClick={handleClose}>
-              Cancel
+              {t('workspace.upload.cancel')}
             </Button>
           </div>
         </DialogFooter>

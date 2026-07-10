@@ -5,6 +5,7 @@ import { ModeToggle } from '@/components/ui/theme-toggle';
 import { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
+import { isAxiosError } from 'axios';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,10 +15,13 @@ import { toast } from '@/hooks/use-toast';
 
 import { login } from '../services/authService';
 import { useUserContext } from '../contexts/UserContext';
+import { useLocale } from '../contexts/LocaleContext';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 
 function LoginPageContent() {
   const router = useRouter();
   const { setUser } = useUserContext();
+  const { t } = useLocale();
   const searchParams = useSearchParams();
   const emailParam = searchParams.get('email') || '';
   const redirectParam = searchParams.get('redirect') || '';
@@ -44,24 +48,21 @@ function LoginPageContent() {
       // Force a full page navigation to ensure cookie is processed
       const redirectUrl = redirectParam || '/dashboard';
       window.location.href = redirectUrl;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to log in:', error);
 
-      // Handle API error responses
-      const message =
-        error.response?.data?.detail || error.message || 'Login failed';
-
-      if (message.includes('not found') || error.response?.status === 404) {
+      const status = isAxiosError(error) ? error.response?.status : null;
+      if (status === 404) {
         toast({
-          title: 'User not found',
-          description:
-            'No account found with that email address. Please sign up first.',
+          title: t('login.userNotFound'),
+          description: t('login.userNotFoundDescription'),
           variant: 'destructive',
         });
       } else {
         toast({
-          title: 'Error',
-          description: message,
+          title: t('auth.genericError'),
+          description:
+            status === 401 ? t('login.invalidCredentials') : t('login.failed'),
           variant: 'destructive',
         });
       }
@@ -73,43 +74,44 @@ function LoginPageContent() {
   return (
     <ScrollArea className="h-screen">
       <div className="container mx-auto py-8 px-4 max-w-md">
-        <div className="absolute top-4 right-4">
+        <div className="absolute top-4 right-4 flex items-center gap-2">
+          <LanguageSwitcher />
           <ModeToggle />
         </div>
         <div className="space-y-6">
           {/* Header */}
           <div className="text-center space-y-2">
             <h1 className="text-2xl font-bold tracking-tight">
-              Welcome back to Docent
+              {t('login.title')}
             </h1>
             <p className="text-sm text-muted-foreground">
-              Enter your email and password to sign in
+              {t('login.description')}
             </p>
           </div>
 
           {/* Login Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email Address</Label>
+              <Label htmlFor="email">{t('auth.emailAddress')}</Label>
               <Input
                 id="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email address"
+                placeholder={t('auth.emailPlaceholder')}
                 disabled={isSubmitting}
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t('auth.password')}</Label>
               <Input
                 id="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter your password"
+                placeholder={t('auth.passwordPlaceholder')}
                 disabled={isSubmitting}
                 required
               />
@@ -123,10 +125,10 @@ function LoginPageContent() {
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Signing in...
+                  {t('login.signingIn')}
                 </>
               ) : (
-                'Sign In'
+                t('login.signIn')
               )}
             </Button>
           </form>
@@ -143,7 +145,7 @@ function LoginPageContent() {
               }}
               className="text-sm"
             >
-              Don&apos;t have an account? Sign up
+              {t('login.noAccount')}
             </Button>
           </div>
         </div>

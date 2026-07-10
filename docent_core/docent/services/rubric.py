@@ -10,6 +10,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from docent._log_util import get_logger
 from docent.data_models.agent_run import AgentRun
 from docent_core._db_service.batched_writer import BatchedWriter
+from docent_core._llm_util.localization import (
+    DEFAULT_LOCALE,
+    SupportedLocale,
+    get_job_response_locale,
+    get_response_locale,
+    get_user_preferred_locale,
+    normalize_locale,
+)
 from docent_core._llm_util.providers.preferences import (
     PROVIDER_PREFERENCES,
 )
@@ -189,8 +197,10 @@ class RubricService:
     ):
         """Start a job to evaluate the rubric."""
 
-        # Is there already a job for this rubric?
-        existing_job = await self._get_active_rubric_job(self.session, rubric_id)
+        locale = get_user_preferred_locale(ctx.user)
+
+        # Is there already a job for this rubric and response locale?
+        existing_job = await self._get_active_rubric_job(self.session, rubric_id, locale=locale)
         if existing_job:
             return existing_job.id
 
@@ -203,6 +213,7 @@ class RubricService:
                 job_json={
                     "rubric_id": rubric_id,
                     "max_results": max_results,
+                    "locale": locale,
                 },
             )
         )
@@ -272,6 +283,8 @@ class RubricService:
     async def run_rubric_job(self, ctx: ViewContext, job: SQLAJob):
         """Run a rubric job. Should only be called by the worker."""
 
+        locale = get_job_response_locale(job.job_json, ctx.user)
+
         # Get the rubric
         rubric_id = job.job_json["rubric_id"]
         rubric = await self.get_rubric(rubric_id, version=None)
@@ -288,6 +301,7 @@ class RubricService:
                     SQLAJudgeResult.rubric_id == rubric_id,
                     SQLAJudgeResult.rubric_version == rubric.version,
                     SQLAJudgeResult.result_type == ResultType.DIRECT_RESULT,
+                    SQLAJudgeResult.locale == locale,
                 )
             )
             num_existing_results = existing_results.scalar_one()
@@ -317,6 +331,7 @@ class RubricService:
                     SQLAJudgeResult.rubric_id == rubric_id,
                     SQLAJudgeResult.rubric_version == rubric.version,
                     SQLAJudgeResult.result_type == ResultType.DIRECT_RESULT,
+                    SQLAJudgeResult.locale == locale,
                 ),
             )
             .group_by(SQLAAgentRun.id)
@@ -360,7 +375,7 @@ class RubricService:
 
                     await writer.add_all(
                         [
-                            SQLAJudgeResult.from_pydantic(judge_result)
+                            SQLAJudgeResult.from_pydantic(judge_result, locale=locale)
                             for judge_result in judge_results
                         ]
                     )
@@ -384,15 +399,22 @@ class RubricService:
                     logger.info(f"Rubric evaluation cancelled after reaching {num_results} results")
 
     async def get_active_job_for_rubric(self, rubric_id: str) -> SQLAJob | None:
-        return await self._get_active_rubric_job(self.session, rubric_id)
+        return await self._get_active_rubric_job(
+            self.session, rubric_id, locale=get_response_locale()
+        )
 
     @staticmethod
-    async def _get_active_rubric_job(session: AsyncSession, rubric_id: str) -> SQLAJob | None:
+    async def _get_active_rubric_job(
+        session: AsyncSession,
+        rubric_id: str,
+        locale: SupportedLocale = DEFAULT_LOCALE,
+    ) -> SQLAJob | None:
         """Has weird type signature because of the polling loop"""
         result = await session.execute(
             select(SQLAJob)
             .where(SQLAJob.type == WorkerFunction.RUBRIC_JOB.value)
             .where(SQLAJob.job_json["rubric_id"].astext == rubric_id)
+            .where(func.coalesce(SQLAJob.job_json["locale"].astext, DEFAULT_LOCALE) == locale)
             .where((SQLAJob.status == JobStatus.PENDING) | (SQLAJob.status == JobStatus.RUNNING))
             .limit(1)
         )
@@ -403,9 +425,13 @@ class RubricService:
     ##################
 
     async def get_rubric_results(
-        self, rubric_id: str, version: int | None = None
+        self,
+        rubric_id: str,
+        version: int | None = None,
+        locale: SupportedLocale | None = None,
     ) -> list[JudgeResult]:
         """Get the results of a rubric."""
+        resolved_locale = normalize_locale(locale) if locale is not None else get_response_locale()
         if version is None:
             # Get the latest version first
             latest_rubric = await self.get_rubric(rubric_id, version=None)
@@ -416,6 +442,7 @@ class RubricService:
         search_query = select(SQLAJudgeResult).where(
             SQLAJudgeResult.rubric_id == rubric_id,
             SQLAJudgeResult.rubric_version == version,
+            SQLAJudgeResult.locale == resolved_locale,
         )
 
         result = await self.session.execute(search_query)
@@ -461,8 +488,10 @@ class RubricService:
     ):
         """Start a job to cluster rubric results."""
 
-        # Is there already a job for this rubric?
-        existing_job = await self.get_active_clustering_job(sq_rubric.id)
+        locale = get_user_preferred_locale(ctx.user)
+
+        # Is there already a job for this rubric and response locale?
+        existing_job = await self.get_active_clustering_job(sq_rubric.id, locale=locale)
         if existing_job:
             return existing_job.id
 
@@ -476,6 +505,7 @@ class RubricService:
                     "rubric_id": sq_rubric.id,
                     "clustering_feedback": clustering_feedback,
                     "recluster": recluster,
+                    "locale": locale,
                 },
             )
         )
@@ -490,11 +520,19 @@ class RubricService:
         if job:
             await self.job_svc.cancel_job(job.id)
 
-    async def get_active_clustering_job(self, rubric_id: str) -> SQLAJob | None:
+    async def get_active_clustering_job(
+        self,
+        rubric_id: str,
+        locale: SupportedLocale | None = None,
+    ) -> SQLAJob | None:
+        resolved_locale = normalize_locale(locale) if locale is not None else get_response_locale()
         result = await self.session.execute(
             select(SQLAJob)
             .where(SQLAJob.type == WorkerFunction.CLUSTERING_JOB.value)
             .where(SQLAJob.job_json["rubric_id"].astext == rubric_id)
+            .where(
+                func.coalesce(SQLAJob.job_json["locale"].astext, DEFAULT_LOCALE) == resolved_locale
+            )
             .where((SQLAJob.status == JobStatus.PENDING) | (SQLAJob.status == JobStatus.RUNNING))
             .order_by(SQLAJob.created_at.desc())
             .limit(1)
@@ -503,6 +541,7 @@ class RubricService:
 
     async def run_clustering_job(self, ctx: ViewContext, job: SQLAJob):
         """Run a clustering job. Should only be called by the worker."""
+        locale = get_job_response_locale(job.job_json, ctx.user)
         rubric_id = job.job_json["rubric_id"]
         sq_rubric = await self.get_rubric(rubric_id, version=None)
         if sq_rubric is None:
@@ -511,22 +550,26 @@ class RubricService:
         recluster = bool(job.job_json.get("recluster", False))
 
         # Propose centroids
-        await self.propose_centroids(sq_rubric, recluster, centroids_feedback)
+        await self.propose_centroids(sq_rubric, recluster, centroids_feedback, locale=locale)
         # Assign centroids
-        await self.assign_centroids(sq_rubric)
+        await self.assign_centroids(sq_rubric, locale=locale)
 
     async def propose_centroids(
         self,
         sq_rubric: SQLARubric,
         recluster: bool,
         feedback: str | None = None,
+        locale: SupportedLocale | None = None,
     ) -> Sequence[SQLARubricCentroid]:
         """Cluster judge results and store cluster information with the judge results.
         If recluster, current centroids will be overwritten."""
         rubric = sq_rubric.to_pydantic()
+        resolved_locale = normalize_locale(locale) if locale is not None else get_response_locale()
 
         # Get all non-null judge results for this rubric
-        judge_results = await self.get_rubric_results(rubric.id, sq_rubric.version)
+        judge_results = await self.get_rubric_results(
+            rubric.id, sq_rubric.version, locale=resolved_locale
+        )
         if not judge_results:
             logger.info(f"No judge results with values found for rubric {rubric.id}")
             return []
@@ -536,11 +579,13 @@ class RubricService:
         # TODO(vincent): figure out how to give type-specific feedback. broken rn
 
         # If we need to regenerate, save centroids and then delete from db
-        cur_sqla_centroids = await self.get_centroids(sq_rubric.id, sq_rubric.version)
+        cur_sqla_centroids = await self.get_centroids(
+            sq_rubric.id, sq_rubric.version, locale=resolved_locale
+        )
         centroid_result_types = set(c.result_type for c in cur_sqla_centroids)
 
         if judge_result_types != centroid_result_types or feedback is not None or recluster:
-            await self.clear_centroids(sq_rubric.id, sq_rubric.version)
+            await self.clear_centroids(sq_rubric.id, sq_rubric.version, locale=resolved_locale)
             await self.session.flush()
 
         async def _cluster_for_type(result_type: ResultType) -> list[SQLARubricCentroid]:
@@ -582,6 +627,7 @@ class RubricService:
                     collection_id=sq_rubric.collection_id,
                     rubric_id=rubric.id,
                     rubric_version=sq_rubric.version,
+                    locale=resolved_locale,
                     centroid=centroid,
                     result_type=result_type,
                 )
@@ -595,8 +641,15 @@ class RubricService:
         centroids = await asyncio.gather(*(_cluster_for_type(rt) for rt in judge_result_types))
         return [c for sqla_centroid in centroids for c in sqla_centroid]
 
-    async def get_centroids(self, rubric_id: str, rubric_version: int | None):
+    async def get_centroids(
+        self,
+        rubric_id: str,
+        rubric_version: int | None,
+        locale: SupportedLocale | None = None,
+    ):
         """Get existing clusters for a rubric."""
+
+        resolved_locale = normalize_locale(locale) if locale is not None else get_response_locale()
 
         # If latest version, figure it out
         if rubric_version is None:
@@ -609,15 +662,21 @@ class RubricService:
             select(SQLARubricCentroid).where(
                 SQLARubricCentroid.rubric_id == rubric_id,
                 SQLARubricCentroid.rubric_version == rubric_version,
+                SQLARubricCentroid.locale == resolved_locale,
             )
         )
         return result.scalars().all()
 
-    async def clear_centroids(self, rubric_id: str, rubric_version: int):
+    async def clear_centroids(
+        self,
+        rubric_id: str,
+        rubric_version: int,
+        locale: SupportedLocale | None = None,
+    ):
         """Clear all centroids for a rubric along with their assignments (cascaded)."""
 
         # Delete each centroid using ORM to trigger cascade deletion
-        centroids = await self.get_centroids(rubric_id, rubric_version)
+        centroids = await self.get_centroids(rubric_id, rubric_version, locale=locale)
         for centroid in centroids:
             await self.session.delete(centroid)
 
@@ -626,8 +685,12 @@ class RubricService:
     async def assign_centroids(
         self,
         sqla_rubric: SQLARubric,
+        locale: SupportedLocale | None = None,
     ):
-        sqla_centroids = await self.get_centroids(sqla_rubric.id, sqla_rubric.version)
+        resolved_locale = normalize_locale(locale) if locale is not None else get_response_locale()
+        sqla_centroids = await self.get_centroids(
+            sqla_rubric.id, sqla_rubric.version, locale=resolved_locale
+        )
         if len(sqla_centroids) == 0:
             logger.info(f"No centroids found for rubric {sqla_rubric.id}")
             return
@@ -639,14 +702,18 @@ class RubricService:
             .join(SQLARubricCentroid, SQLAJudgeResultCentroid.centroid_id == SQLARubricCentroid.id)
             .where(
                 SQLAJudgeResult.rubric_id == sqla_rubric.id,
+                SQLAJudgeResult.locale == resolved_locale,
                 SQLARubricCentroid.rubric_id == sqla_rubric.id,
                 SQLARubricCentroid.rubric_version == sqla_rubric.version,
+                SQLARubricCentroid.locale == resolved_locale,
             )
         )
         assigned_pairs = set(cast(list[tuple[str, str]], result.all()))
 
         # Get all non-null judge results for this rubric
-        judge_results = await self.get_rubric_results(sqla_rubric.id, sqla_rubric.version)
+        judge_results = await self.get_rubric_results(
+            sqla_rubric.id, sqla_rubric.version, locale=resolved_locale
+        )
         if not judge_results:
             logger.info(f"No judge results with values found for rubric {sqla_rubric.id}")
             return
@@ -704,7 +771,10 @@ class RubricService:
             )
 
     async def get_centroid_assignments(
-        self, rubric_id: str, rubric_version: int | None = None
+        self,
+        rubric_id: str,
+        rubric_version: int | None = None,
+        locale: SupportedLocale | None = None,
     ) -> dict[str, list[str]]:
         """Get centroid assignments for a rubric.
 
@@ -719,14 +789,15 @@ class RubricService:
                 return {}
             rubric_version = latest_rubric.version
 
-        # Get all centroids for this rubric
-        centroids_result = await self.session.execute(
-            select(SQLARubricCentroid).where(
-                SQLARubricCentroid.rubric_id == rubric_id,
-                SQLARubricCentroid.rubric_version == rubric_version,
-            )
+        # Get all centroids for this rubric and response locale.
+        centroids = await self.get_centroids(
+            rubric_id,
+            rubric_version,
+            locale=locale,
         )
-        centroids = centroids_result.scalars().all()
+
+        if not centroids:
+            return {}
 
         # Get all assignments for these centroids where decision=True
         assignments_result = await self.session.execute(
@@ -803,13 +874,17 @@ class RubricService:
         return result_label.to_pydantic()
 
     async def get_judge_run_labels_and_results(
-        self, rubric_id: str
+        self,
+        rubric_id: str,
+        locale: SupportedLocale | None = None,
     ) -> list[tuple[JudgeRunLabel, JudgeResult]]:
         """Get all run labels and results for a rubric."""
         # Use the latest rubric version to avoid mixing versions in context
         latest_version = await self.get_latest_rubric_version(rubric_id)
         if latest_version is None:
             return []
+
+        resolved_locale = normalize_locale(locale) if locale is not None else get_response_locale()
 
         result = await self.session.execute(
             select(SQLAJudgeRunLabel, SQLAJudgeResult)
@@ -819,6 +894,7 @@ class RubricService:
                 SQLAJudgeResult.rubric_id == rubric_id,
                 SQLAJudgeResult.rubric_version == latest_version,
                 SQLAJudgeResult.result_type == ResultType.DIRECT_RESULT,
+                SQLAJudgeResult.locale == resolved_locale,
             )
         )
         rows = result.all()

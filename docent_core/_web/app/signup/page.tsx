@@ -3,6 +3,7 @@
 import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { isAxiosError } from 'axios';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,11 +19,14 @@ import {
 
 import { signup } from '../services/authService';
 import { useUserContext } from '../contexts/UserContext';
+import { useLocale } from '../contexts/LocaleContext';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 
 function SignupPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { setUser } = useUserContext();
+  const { locale, t } = useLocale();
   const redirectParam = searchParams.get('redirect') || '';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -54,17 +58,11 @@ function SignupPageContent() {
       src: 'https://transluce-videos.s3.us-east-1.amazonaws.com/docent-landing-page/features-1-refinement.mp4',
       description: (
         <>
-          <div className="font-semibold text-lg">1. Create a rubric</div>
+          <div className="font-semibold text-lg">
+            {t('signup.featureCreateTitle')}
+          </div>
           <div className="text-sm space-y-3 text-muted-foreground">
-            <p>
-              Ask any question about your agent, such as &quot;where is it
-              reward hacking?&quot; or &quot;why did it fail?&quot;
-            </p>
-            <p>
-              Docent first converts it into a precise <b>behavior rubric</b> by
-              reading through your data, asking questions about ambiguities, and
-              suggesting concrete re-writes based on your feedback.
-            </p>
+            <p>{t('signup.featureCreateDescription')}</p>
           </div>
         </>
       ),
@@ -73,11 +71,11 @@ function SignupPageContent() {
       src: 'https://transluce-videos.s3.us-east-1.amazonaws.com/docent-landing-page/features-2-exploring-results.mp4',
       description: (
         <>
-          <div className="font-semibold text-lg">2. Spot-check results</div>
+          <div className="font-semibold text-lg">
+            {t('signup.featureReviewTitle')}
+          </div>
           <div className="text-sm space-y-3 text-muted-foreground">
-            Docent then searches for agent behaviors that match your rubric. You
-            can click on each result to see <b>where</b> it was found in each
-            transcript, as well as an explanation of <b>why</b> it matched.
+            {t('signup.featureReviewDescription')}
           </div>
         </>
       ),
@@ -86,13 +84,11 @@ function SignupPageContent() {
       src: 'https://transluce-videos.s3.us-east-1.amazonaws.com/docent-landing-page/features-3-charts.mp4',
       description: (
         <>
-          <div className="font-semibold text-lg">3. Quantify and visualize</div>
+          <div className="font-semibold text-lg">
+            {t('signup.featureVisualizeTitle')}
+          </div>
           <div className="text-sm space-y-3 text-muted-foreground">
-            Finally, visualize quantitative patterns by{' '}
-            <b>aggregating, slicing, and filtering</b> using Docent&apos;s
-            charts. For example, you can plot the number of reward hacks across
-            training steps, or compare the prevalence of reward hacking between
-            different models.
+            {t('signup.featureVisualizeDescription')}
           </div>
         </>
       ),
@@ -104,7 +100,7 @@ function SignupPageContent() {
 
     setIsSubmitting(true);
     try {
-      const { user } = await signup(email.trim(), password.trim()); // Pure API call
+      const { user } = await signup(email.trim(), password.trim(), locale); // Pure API call
 
       // Set user in context immediately to prevent race condition
       setUser(user);
@@ -112,27 +108,20 @@ function SignupPageContent() {
       // Force a full page navigation to ensure cookie is processed
       const redirectUrl = redirectParam || '/onboarding';
       window.location.href = redirectUrl;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to sign up:', error);
 
-      // Handle API error responses
-      const message =
-        error.response?.data?.detail || error.message || 'Signup failed';
-
-      if (
-        message.includes('already exists') ||
-        error.response?.status === 409
-      ) {
+      const status = isAxiosError(error) ? error.response?.status : null;
+      if (status === 409) {
         toast({
-          title: 'Account Already Exists',
-          description:
-            'A user with this email already exists. Please log in instead.',
+          title: t('signup.accountExists'),
+          description: t('signup.accountExistsDescription'),
           variant: 'destructive',
         });
       } else {
         toast({
-          title: 'Error',
-          description: message,
+          title: t('auth.genericError'),
+          description: t('signup.failed'),
           variant: 'destructive',
         });
       }
@@ -143,41 +132,44 @@ function SignupPageContent() {
 
   return (
     <div className="h-screen flex flex-col lg:flex-row overflow-y-auto">
+      <div className="absolute right-4 top-4 z-10">
+        <LanguageSwitcher />
+      </div>
       <div className="flex-1 flex items-center justify-center">
         <div className="py-8 px-4 max-w-md flex-1 space-y-6">
           {/* Header */}
           <div className="text-center space-y-2">
             <h1 className="text-2xl font-bold tracking-tight">
-              Create your Docent account
+              {t('signup.title')}
             </h1>
             <p className="text-sm text-muted-foreground">
-              Enter your email and password to get started
+              {t('signup.description')}
             </p>
           </div>
 
           {/* Signup Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email Address</Label>
+              <Label htmlFor="email">{t('auth.emailAddress')}</Label>
               <Input
                 id="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email address"
+                placeholder={t('auth.emailPlaceholder')}
                 disabled={isSubmitting}
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t('auth.password')}</Label>
               <Input
                 id="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter your password"
+                placeholder={t('auth.passwordPlaceholder')}
                 disabled={isSubmitting}
                 required
               />
@@ -191,10 +183,10 @@ function SignupPageContent() {
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating account...
+                  {t('signup.creating')}
                 </>
               ) : (
-                'Create Account'
+                t('signup.createAccount')
               )}
             </Button>
           </form>
@@ -211,14 +203,14 @@ function SignupPageContent() {
               }}
               className="text-sm"
             >
-              Already have an account? Sign in
+              {t('signup.haveAccount')}
             </Button>
           </div>
         </div>
       </div>
       <div className="flex-1 flex flex-col items-center justify-center p-3 space-y-3">
         <div className="text-primary text-2xl font-bold text-center">
-          A quick look at how Docent works
+          {t('signup.howItWorks')}
         </div>
 
         {/* Buttons */}
@@ -229,7 +221,7 @@ function SignupPageContent() {
               target="_blank"
               rel="noopener noreferrer"
             >
-              Quickstart guide
+              {t('signup.quickstart')}
             </a>
           </Button>
           <Button asChild variant="outline">
@@ -238,7 +230,7 @@ function SignupPageContent() {
               target="_blank"
               rel="noopener noreferrer"
             >
-              Slack community
+              {t('signup.slack')}
             </a>
           </Button>
           <Button asChild variant="outline">
@@ -247,7 +239,7 @@ function SignupPageContent() {
               target="_blank"
               rel="noopener noreferrer"
             >
-              Schedule a call
+              {t('signup.scheduleCall')}
             </a>
           </Button>
           <Button asChild variant="outline">
@@ -256,7 +248,7 @@ function SignupPageContent() {
               target="_blank"
               rel="noopener noreferrer"
             >
-              Email us
+              {t('signup.emailUs')}
             </a>
           </Button>
         </div>
@@ -284,7 +276,7 @@ function SignupPageContent() {
                         onEnded={() => carouselApi?.scrollNext()}
                       >
                         <source src={item.src} type="video/mp4" />
-                        Your browser does not support the video tag.
+                        {t('signup.videoUnsupported')}
                       </video>
                     </div>
                   </div>
@@ -300,7 +292,7 @@ function SignupPageContent() {
               variant="outline"
               size="icon"
               onClick={() => carouselApi?.scrollPrev()}
-              aria-label="Previous slide"
+              aria-label={t('signup.previousSlide')}
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -312,7 +304,7 @@ function SignupPageContent() {
               variant="outline"
               size="icon"
               onClick={() => carouselApi?.scrollNext()}
-              aria-label="Next slide"
+              aria-label={t('signup.nextSlide')}
             >
               <ChevronRight className="h-4 w-4" />
             </Button>

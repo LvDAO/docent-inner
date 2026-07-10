@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.types import Numeric
 
 from docent._log_util import get_logger
+from docent_core._llm_util.localization import get_user_preferred_locale
 from docent_core.docent.db.contexts import ViewContext
 from docent_core.docent.db.filters import ComplexFilter
 from docent_core.docent.db.schemas.chart import SQLAChart
@@ -708,6 +709,7 @@ class ChartsService:
             measure=measure_dimension,
             runs_filter=chart.runs_filter,
             collection_id=ctx.collection_id,
+            locale=get_user_preferred_locale(ctx.user),
         )
 
         # Execute the query

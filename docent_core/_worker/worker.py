@@ -12,6 +12,10 @@ from arq.worker import run_worker
 
 from docent._log_util import get_logger
 from docent_core._env_util import ENV, get_deployment_id, init_sentry_or_raise
+from docent_core._llm_util.localization import (
+    get_job_response_locale,
+    response_locale_context,
+)
 from docent_core._server._broker.redis_client import get_redis_client
 from docent_core._worker.constants import JOB_TIMEOUT_SECONDS, WORKER_QUEUE_NAME
 from docent_core._worker.job_worker_map import JOB_DISPATCHER_MAP
@@ -61,8 +65,11 @@ async def run_job(_: Any, ctx: ViewContext, job_id: str):
             if job.type not in JOB_DISPATCHER_MAP:
                 raise ValueError(f"Unknown job type: {job.type}")
 
-            # Run the job with the appropriate function
-            await JOB_DISPATCHER_MAP[job.type](ctx, job)
+            # Prefer persisted job provenance, then fall back to the queued user's preference.
+            job_locale = get_job_response_locale(job.job_json, ctx.user)
+            with response_locale_context(job_locale):
+                # Run the job with the appropriate function.
+                await JOB_DISPATCHER_MAP[job.type](ctx, job)
         except anyio.get_cancelled_exc_class():
             canceled = True
             raise

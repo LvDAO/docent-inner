@@ -8,6 +8,7 @@ import {
 import { PlusIcon, Upload, BookOpen, Code } from 'lucide-react';
 import { useRef, useState } from 'react';
 import UploadRunsDialog from './UploadRunsDialog';
+import { useLocale } from '../contexts/LocaleContext';
 
 interface UploadRunsButtonProps {
   onImportSuccess?: () => void;
@@ -18,6 +19,7 @@ export default function UploadRunsButton({
   onImportSuccess,
   disabled = false,
 }: UploadRunsButtonProps) {
+  const { t } = useLocale();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -62,6 +64,7 @@ export default function UploadRunsButton({
         ref={fileInputRef}
         type="file"
         accept=".json,.eval"
+        aria-label={t('workspace.upload.chooseFile')}
         onChange={handleFileSelect}
         style={{ display: 'none' }}
       />
@@ -75,21 +78,21 @@ export default function UploadRunsButton({
             disabled={disabled}
           >
             <PlusIcon size={14} className="mr-1" />
-            Add Data
+            {t('workspace.addData')}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={handleUploadClick}>
             <Upload className="mr-2 h-4 w-4" />
-            Upload Inspect Log
+            {t('workspace.upload.inspectLog')}
           </DropdownMenuItem>
           <DropdownMenuItem onClick={handleUseSDKClick}>
             <BookOpen className="mr-2 h-4 w-4" />
-            Use SDK
+            {t('workspace.upload.useSdk')}
           </DropdownMenuItem>
           <DropdownMenuItem onClick={handleUseTracingClick}>
             <Code className="mr-2 h-4 w-4" />
-            Use Tracing
+            {t('workspace.upload.useTracing')}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

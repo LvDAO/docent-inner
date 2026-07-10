@@ -3,6 +3,7 @@
 import { CaretSortIcon, CheckIcon } from '@radix-ui/react-icons';
 import * as React from 'react';
 
+import { useLocale } from '@/app/contexts/LocaleContext';
 import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
@@ -50,16 +51,18 @@ export function SelectWithSubmenus({
   onChange,
   selectedLabel,
   allowNone = true,
-  noneLabel = 'None',
+  noneLabel,
   disabled = false,
   className,
   children,
 }: SelectWithSubmenusProps) {
+  const { t } = useLocale();
+  const resolvedNoneLabel = noneLabel ?? t('misc.select.none');
   const triggerLabel = React.useMemo(() => {
     if (selectedLabel) return selectedLabel;
-    if (selectedKey === null) return noneLabel;
+    if (selectedKey === null) return resolvedNoneLabel;
     return selectedKey;
-  }, [selectedLabel, selectedKey, noneLabel]);
+  }, [resolvedNoneLabel, selectedLabel, selectedKey]);
 
   const contextValue = React.useMemo(
     () => ({ selectedKey, onChange }),
@@ -91,7 +94,7 @@ export function SelectWithSubmenus({
               onClick={() => onChange(null)}
               aria-checked={selectedKey === null}
             >
-              {noneLabel}
+              {resolvedNoneLabel}
               {selectedKey === null && (
                 <span className="absolute right-2 flex h-3.5 w-3.5 items-center justify-center">
                   <CheckIcon className="h-4 w-4" />

@@ -9,6 +9,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { BaseMetadata } from '@/app/types/transcriptTypes';
+import { useLocale } from '@/app/contexts/LocaleContext';
 
 function isEmptyObject(obj: Record<string, any>) {
   return !obj || Object.keys(obj).length === 0;
@@ -48,6 +49,7 @@ function DefaultTrigger({
   className?: string;
   disabled?: boolean;
 }) {
+  const { t } = useLocale();
   const classes = cn(
     'text-xs flex items-center gap-1 h-6 px-1 py-0.5 shadow-none',
     'data-[state=open]:bg-indigo-bg data-[state=open]:border-indigo-border data-[state=open]:text-primary',
@@ -62,7 +64,7 @@ function DefaultTrigger({
         disabled={disabled}
       >
         <FileText className="h-3 w-3" />
-        <span>Metadata</span>
+        <span>{t('results.metadata.label')}</span>
       </Button>
     </PopoverTrigger>
   );
@@ -140,14 +142,13 @@ type BodyProps = {
   children: (metadata: BaseMetadata) => React.ReactNode;
 };
 
-function Body({
-  metadata,
-  emptyText = 'No metadata available',
-  children,
-}: BodyProps) {
+function Body({ metadata, emptyText, children }: BodyProps) {
+  const { t } = useLocale();
   if (isEmptyObject(metadata)) {
     return (
-      <div className="text-center py-8 text-muted-foreground">{emptyText}</div>
+      <div className="text-center py-8 text-muted-foreground">
+        {emptyText ?? t('results.metadata.empty')}
+      </div>
     );
   }
   return <div className="space-y-3">{children(metadata)}</div>;

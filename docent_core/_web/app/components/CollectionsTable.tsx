@@ -23,6 +23,7 @@ import {
 
 import CollectionRow from './CollectionRow';
 import { useDeleteCollectionMutation } from '../api/collectionApi';
+import { useLocale } from '../contexts/LocaleContext';
 
 interface CollectionsTableProps {
   collections?: Collection[];
@@ -33,6 +34,7 @@ export function CollectionsTable({
   collections,
   isLoading,
 }: CollectionsTableProps) {
+  const { t } = useLocale();
   // Delete dialog state – kept here so multiple rows can reuse shared dialog
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deletingCollection, setDeletingCollection] =
@@ -66,10 +68,10 @@ export function CollectionsTable({
           <Layers className="h-7 w-7 text-primary" />
         </div>
         <h3 className="text-sm font-medium text-primary mb-1">
-          No collections available
+          {t('collections.emptyTitle')}
         </h3>
         <p className="text-xs text-muted-foreground max-w-md">
-          Create a new collection to get started.
+          {t('collections.emptyDescription')}
         </p>
       </div>
     );
@@ -81,19 +83,19 @@ export function CollectionsTable({
         <TableHeader className="bg-secondary sticky top-0">
           <TableRow>
             <TableHead className="w-[15%] py-2.5 font-medium text-xs text-muted-foreground">
-              ID
+              {t('collections.id')}
             </TableHead>
             <TableHead className="w-[25%] py-2.5 font-medium text-xs text-muted-foreground">
-              Name
+              {t('common.name')}
             </TableHead>
             <TableHead className="w-[35%] py-2.5 font-medium text-xs text-muted-foreground">
-              Description
+              {t('common.description')}
             </TableHead>
             <TableHead className="w-[15%] py-2.5 font-medium text-xs text-muted-foreground">
-              Created
+              {t('common.created')}
             </TableHead>
             <TableHead className="w-[10%] py-2.5 font-medium text-xs text-muted-foreground text-right">
-              Actions
+              {t('common.actions')}
             </TableHead>
           </TableRow>
         </TableHeader>
@@ -112,20 +114,20 @@ export function CollectionsTable({
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Collection</DialogTitle>
+            <DialogTitle>{t('collections.deleteTitle')}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this collection? This action
-              cannot be undone.
+              {t('collections.deleteDescription')}
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
             {deletingCollection && (
               <div className="flex flex-col space-y-2 bg-secondary p-3 rounded-md">
                 <div className="text-sm font-medium break-all">
-                  {deletingCollection.name || 'Unnamed Collection'}
+                  {deletingCollection.name || t('collections.unnamed')}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {deletingCollection.description || 'No description'}
+                  {deletingCollection.description ||
+                    t('collections.noDescription')}
                 </div>
                 <div className="text-xs font-mono text-secondary">
                   ID: {deletingCollection.id}
@@ -138,10 +140,10 @@ export function CollectionsTable({
               variant="outline"
               onClick={() => setIsDeleteDialogOpen(false)}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button variant="destructive" onClick={handleDeleteCollection}>
-              Delete
+              {t('common.delete')}
             </Button>
           </DialogFooter>
         </DialogContent>

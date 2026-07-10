@@ -18,6 +18,7 @@ from docent_core.docent.services.charts import (
     JudgeOutputDimension,
     RunMetadataDimension,
 )
+from docent_core.localization import DEFAULT_LOCALE, SupportedLocale
 
 if TYPE_CHECKING:
     from docent_core.docent.services.charts import ChartDimension
@@ -58,6 +59,7 @@ def generate_chart_query(
     measure: "ChartDimension",
     runs_filter: Optional[ComplexFilter],
     collection_id: str,
+    locale: SupportedLocale = DEFAULT_LOCALE,
 ) -> Select[Any]:
     """Generate SQL query for chart data using ChartDimension objects.
 
@@ -68,6 +70,7 @@ def generate_chart_query(
         measure: ChartDimension object for the measure
         runs_filter: Optional filter for agent runs
         collection_id: Collection to query
+        locale: Locale of judge artifacts to include
 
     Returns:
         Complete SQL query for chart data
@@ -111,6 +114,7 @@ def generate_chart_query(
                 and_(
                     SQLAJudgeResult.rubric_id == dim.judge_id,
                     SQLAJudgeResult.rubric_version == dim.judge_version,
+                    SQLAJudgeResult.locale == locale,
                 )
             )
             .subquery(name=f"judge_subquery_{idx}")

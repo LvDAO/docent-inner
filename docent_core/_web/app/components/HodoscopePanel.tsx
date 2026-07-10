@@ -27,7 +27,6 @@ import { cn } from '@/lib/utils';
 import { navToAgentRun } from '@/lib/nav';
 
 import {
-  HodoscopeProjection,
   HodoscopeProjectionMethod,
   HodoscopeProjectionPoint,
   useCancelHodoscopeAnalysisMutation,
@@ -37,6 +36,7 @@ import {
   useStartHodoscopeAnalysisMutation,
 } from '../api/hodoscopeApi';
 import { useGetAgentRunMetadataFieldsQuery } from '../api/collectionApi';
+import { useLocale } from '../contexts/LocaleContext';
 import { useAppSelector } from '../store/hooks';
 
 const DEFAULT_LIMIT = 500;
@@ -52,14 +52,6 @@ const GROUP_COLORS = [
   'hsl(var(--red-text))',
   'hsl(var(--indigo-text))',
 ];
-
-const statusLabel: Record<string, string> = {
-  pending: 'Pending',
-  running: 'Running',
-  complete: 'Complete',
-  error: 'Error',
-  canceled: 'Canceled',
-};
 
 function normalizePoints(points: HodoscopeProjectionPoint[]) {
   if (points.length === 0) {
@@ -91,14 +83,6 @@ function getGroupColor(group: string, groups: string[]) {
   return GROUP_COLORS[idx % GROUP_COLORS.length];
 }
 
-function projectionStateText(projection?: HodoscopeProjection) {
-  if (!projection) {
-    return 'No map data yet';
-  }
-
-  return `${projection.points.length} actions across ${projection.groups.length} groups`;
-}
-
 export function HodoscopePanel({
   hasWritePermission,
 }: {
@@ -106,6 +90,26 @@ export function HodoscopePanel({
 }) {
   const collectionId = useAppSelector((state) => state.collection.collectionId);
   const router = useRouter();
+  const { t } = useLocale();
+
+  const statusLabels: Record<string, string> = {
+    pending: t('analysis.hodoscope.pending'),
+    running: t('analysis.hodoscope.running'),
+    complete: t('analysis.hodoscope.complete'),
+    error: t('analysis.hodoscope.error'),
+    canceled: t('analysis.hodoscope.canceled'),
+  };
+  const stageLabels: Record<string, string> = {
+    pending: t('analysis.hodoscope.stage.pending'),
+    loading_runs: t('analysis.hodoscope.stage.loadingRuns'),
+    extracting_actions: t('analysis.hodoscope.stage.extractingActions'),
+    summarizing: t('analysis.hodoscope.stage.summarizing'),
+    embedding: t('analysis.hodoscope.stage.embedding'),
+    projecting: t('analysis.hodoscope.stage.projecting'),
+    complete: t('analysis.hodoscope.stage.complete'),
+    error: t('analysis.hodoscope.stage.error'),
+    canceled: t('analysis.hodoscope.stage.canceled'),
+  };
 
   const [groupBy, setGroupBy] = useState(AUTO_GROUP);
   const [limit, setLimit] = useState(DEFAULT_LIMIT);
@@ -212,7 +216,7 @@ export function HodoscopePanel({
     await startAnalysis({
       collectionId,
       config: {
-        name: 'Hodoscope analysis',
+        name: t('analysis.hodoscope.analysisName'),
         group_by: groupBy === AUTO_GROUP ? null : groupBy,
         limit,
         seed: DEFAULT_SEED,
@@ -282,7 +286,9 @@ export function HodoscopePanel({
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <Radar className="h-4 w-4 text-blue-text" />
-            <div className="text-sm font-semibold">Hodoscope</div>
+            <div className="text-sm font-semibold">
+              {t('analysis.hodoscope.title')}
+            </div>
             {currentAnalysis ? (
               <Badge
                 variant={
@@ -291,26 +297,37 @@ export function HodoscopePanel({
                     : 'secondary'
                 }
               >
-                {statusLabel[currentAnalysis.status] ?? currentAnalysis.status}
+                {statusLabels[currentAnalysis.status] ?? currentAnalysis.status}
               </Badge>
             ) : null}
           </div>
           <div className="mt-1 text-xs text-muted-foreground">
             {currentAnalysis?.stage
-              ? `${currentAnalysis.stage} · ${currentAnalysis.point_count} points`
-              : projectionStateText(projection)}
+              ? t('analysis.hodoscope.stagePoints', {
+                  stage:
+                    stageLabels[currentAnalysis.stage] ?? currentAnalysis.stage,
+                  points: currentAnalysis.point_count,
+                })
+              : projection
+                ? t('analysis.hodoscope.actionsAcrossGroups', {
+                    actions: projection.points.length,
+                    groups: projection.groups.length,
+                  })
+                : t('analysis.hodoscope.noMapData')}
           </div>
         </div>
 
         <div className="flex flex-wrap items-end gap-2">
           <div className="w-52">
-            <Label className="text-xs">Group by</Label>
+            <Label className="text-xs">{t('analysis.hodoscope.groupBy')}</Label>
             <Select value={groupBy} onValueChange={setGroupBy}>
               <SelectTrigger className="mt-1 h-8">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={AUTO_GROUP}>Auto detect model</SelectItem>
+                <SelectItem value={AUTO_GROUP}>
+                  {t('analysis.hodoscope.autoDetectModel')}
+                </SelectItem>
                 {fieldOptions.map((field) => (
                   <SelectItem key={field} value={field}>
                     {field}
@@ -321,7 +338,7 @@ export function HodoscopePanel({
           </div>
 
           <div className="w-24">
-            <Label className="text-xs">Max runs</Label>
+            <Label className="text-xs">{t('analysis.hodoscope.maxRuns')}</Label>
             <Input
               className="mt-1 h-8"
               min={1}
@@ -335,7 +352,9 @@ export function HodoscopePanel({
           </div>
 
           <div className="w-32">
-            <Label className="text-xs">Projection</Label>
+            <Label className="text-xs">
+              {t('analysis.hodoscope.projection')}
+            </Label>
             <Select
               value={projectionMethod}
               onValueChange={(value) =>
@@ -368,7 +387,7 @@ export function HodoscopePanel({
               ) : (
                 <Square className="mr-2 h-3.5 w-3.5" />
               )}
-              Cancel
+              {t('common.cancel')}
             </Button>
           ) : (
             <Button
@@ -382,7 +401,7 @@ export function HodoscopePanel({
               ) : (
                 <Play className="mr-2 h-3.5 w-3.5" />
               )}
-              Run
+              {t('analysis.hodoscope.run')}
             </Button>
           )}
 
@@ -452,7 +471,7 @@ export function HodoscopePanel({
           ) : (
             <div className="flex h-64 flex-col items-center justify-center px-4 text-center text-xs text-muted-foreground">
               <Radar className="mb-2 h-5 w-5" />
-              Run Hodoscope to project action summaries for this collection.
+              {t('analysis.hodoscope.empty')}
             </div>
           )}
         </div>
@@ -460,7 +479,9 @@ export function HodoscopePanel({
         <div className="min-w-0 space-y-3">
           {projection?.groups.length ? (
             <div className="space-y-1">
-              <div className="text-xs font-medium">Groups</div>
+              <div className="text-xs font-medium">
+                {t('analysis.hodoscope.groups')}
+              </div>
               <div className="flex flex-wrap gap-1.5">
                 {projection.groups.map((group) => (
                   <Badge
@@ -505,7 +526,9 @@ export function HodoscopePanel({
           ) : null}
 
           <div className="space-y-1">
-            <div className="text-xs font-medium">Representatives</div>
+            <div className="text-xs font-medium">
+              {t('analysis.hodoscope.representatives')}
+            </div>
             <div className="max-h-48 space-y-1 overflow-auto pr-1">
               {representatives.length ? (
                 representatives.map((point) => (
@@ -534,7 +557,7 @@ export function HodoscopePanel({
                 ))
               ) : (
                 <div className="rounded-md border border-blue-border px-3 py-6 text-center text-xs text-muted-foreground">
-                  No representative samples yet.
+                  {t('analysis.hodoscope.noRepresentatives')}
                 </div>
               )}
             </div>

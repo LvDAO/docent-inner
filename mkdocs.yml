@@ -26,6 +26,8 @@ nav:
   - Quickstart: quickstart.md
   - Tracing: tracing/introduction.md
   - Get support: support.md
+  - User Settings:
+      - Language: user_settings/language.md
   - Tutorials:
       - tutorials/search_and_clustering.md
       - tutorials/logging_agent_runs.md

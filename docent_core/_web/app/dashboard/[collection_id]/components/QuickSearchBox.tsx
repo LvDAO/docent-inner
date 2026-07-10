@@ -1,3 +1,5 @@
+'use client';
+
 import { useState } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -15,33 +17,7 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from '@/components/ui/tooltip';
-
-const DEFAULT_PLACEHOLDER_TEXT =
-  'Describe an agent behavior you want to explore...';
-const PRESET_QUERIES = [
-  {
-    id: 'env',
-    label: 'Scaffolding issues',
-    query: 'potential issues with the environment the agent is operating in',
-    icon: Earth,
-    color: 'text-blue-text',
-  },
-  {
-    id: 'strange',
-    label: 'Strange behaviors',
-    query: 'cases where the agent acted in a strange or unexpected way',
-    icon: HelpCircle,
-    color: 'text-orange-text',
-  },
-  {
-    id: 'unfollow',
-    label: 'Disobeying prompt',
-    query:
-      'cases where the agent did not follow instructions given to it or directly disobeyed them',
-    icon: AlertTriangle,
-    color: 'text-red-text',
-  },
-];
+import { useLocale } from '@/app/contexts/LocaleContext';
 
 interface QuickSearchBoxProps {
   onGuided: (highLevelDescription: string) => void;
@@ -54,26 +30,49 @@ export default function QuickSearchBox({
   onDirect,
   isLoading,
 }: QuickSearchBoxProps) {
+  const { t } = useLocale();
+  const presetQueries = [
+    {
+      id: 'env',
+      label: t('chat.search.scaffolding.label'),
+      query: t('chat.search.scaffolding.prompt'),
+      icon: Earth,
+      color: 'text-blue-text',
+    },
+    {
+      id: 'strange',
+      label: t('chat.search.strangeBehavior.label'),
+      query: t('chat.search.strangeBehavior.prompt'),
+      icon: HelpCircle,
+      color: 'text-orange-text',
+    },
+    {
+      id: 'unfollow',
+      label: t('chat.search.disobeyingPrompt.label'),
+      query: t('chat.search.disobeyingPrompt.prompt'),
+      icon: AlertTriangle,
+      color: 'text-red-text',
+    },
+  ];
+
   /**
    * Presets
    */
-  const [isPresetHovered, setIsPresetHovered] = useState(false);
+  const [hoveredPresetQuery, setHoveredPresetQuery] = useState<string | null>(
+    null
+  );
+  const isPresetHovered = hoveredPresetQuery !== null;
   const [searchQueryTextboxValue, setSearchQueryTextboxValue] = useState('');
   const emptyInput = searchQueryTextboxValue.trim() === '';
-  const [placeholderText, setPlaceholderText] = useState(
-    DEFAULT_PLACEHOLDER_TEXT
-  );
   const handleSelectPreset = (query: string) => {
     setSearchQueryTextboxValue(query);
-    setIsPresetHovered(false);
+    setHoveredPresetQuery(null);
   };
   const handlePresetHover = (query: string) => {
-    setIsPresetHovered(true);
-    setPlaceholderText(query);
+    setHoveredPresetQuery(query);
   };
   const handlePresetLeave = () => {
-    setIsPresetHovered(false);
-    setPlaceholderText(DEFAULT_PLACEHOLDER_TEXT);
+    setHoveredPresetQuery(null);
   };
 
   const hasWritePermission = useHasCollectionWritePermission();
@@ -98,7 +97,7 @@ export default function QuickSearchBox({
       <fieldset className="relative">
         <Textarea
           className="h-[10rem] resize-none border-0 p-2 shadow-none focus-visible:ring-0 text-xs font-mono"
-          placeholder={placeholderText}
+          placeholder={hoveredPresetQuery ?? t('chat.search.placeholder')}
           value={isPresetHovered ? '' : searchQueryTextboxValue}
           disabled={!hasWritePermission}
           onChange={(e) => setSearchQueryTextboxValue(e.target.value)}
@@ -120,7 +119,7 @@ export default function QuickSearchBox({
             disabled={!hasWritePermission || emptyInput || isLoading}
           >
             <Search className="size-3 -ml-0.5" />
-            Direct search
+            {t('chat.search.direct')}
           </Button>
           <Button
             type="submit"
@@ -129,7 +128,7 @@ export default function QuickSearchBox({
             disabled={!hasWritePermission || emptyInput || isLoading}
           >
             <ConciergeBell className="size-3.5 -ml-0.5" />
-            Guided search
+            {t('chat.search.guided')}
           </Button>
         </div>
       </fieldset>
@@ -141,15 +140,17 @@ export default function QuickSearchBox({
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <div className="flex flex-col">
-          <div className="text-sm font-semibold">Create a rubric</div>
+          <div className="text-sm font-semibold">{t('chat.search.title')}</div>
           <div className="text-xs text-muted-foreground">
-            Find and explore occurrences of an agent behavior
+            {t('chat.search.description')}
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <div className="text-[11px] text-muted-foreground">Try a preset:</div>
+          <div className="text-[11px] text-muted-foreground">
+            {t('chat.search.tryPreset')}
+          </div>
           <div className="flex flex-wrap gap-1">
-            {PRESET_QUERIES.map((preset) => {
+            {presetQueries.map((preset) => {
               const IconComponent = preset.icon;
               return (
                 <button
@@ -173,10 +174,7 @@ export default function QuickSearchBox({
           <Tooltip>
             <TooltipTrigger asChild>{searchForm}</TooltipTrigger>
             <TooltipContent>
-              <p>
-                This search box is disabled because you&apos;re in read-only
-                mode
-              </p>
+              <p>{t('chat.search.readOnly')}</p>
             </TooltipContent>
           </Tooltip>
         ) : (

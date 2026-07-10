@@ -21,6 +21,7 @@ from docent.data_models.citation import (
 )
 from docent.data_models.remove_invalid_citation_ranges import remove_invalid_citation_ranges
 from docent_core._llm_util.data_models.llm_output import LLMOutput
+from docent_core._llm_util.localization import get_user_preferred_locale
 from docent_core._llm_util.prod_llms import get_llm_completions_async
 from docent_core._llm_util.providers.preferences import PROVIDER_PREFERENCES, ModelOption
 from docent_core._server._broker.redis_client import (
@@ -309,7 +310,10 @@ class ChatService:
                 SQLAJob(
                     id=job_id,
                     type=WorkerFunction.CHAT_JOB.value,
-                    job_json={"session_id": sqla_session.id},
+                    job_json={
+                        "session_id": sqla_session.id,
+                        "locale": get_user_preferred_locale(ctx.user),
+                    },
                 )
             )
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useState, useEffect, useMemo } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import {
   ChatArea,
   SuggestedMessage,
@@ -17,6 +17,7 @@ import SelectionBadges from './SelectionBadges';
 import { Citation } from '@/app/types/experimentViewerTypes';
 import { useTextSelection } from '@/providers/use-text-selection';
 import { useCitationNavigation } from '@/app/dashboard/[collection_id]/rubric/[rubric_id]/NavigateToCitationContext';
+import { useLocale } from '@/app/contexts/LocaleContext';
 
 const ESTIMATED_CHAT_MESSAGE_OUTPUT_TOKENS = 8192;
 
@@ -39,50 +40,16 @@ export interface TranscriptChatProps {
   className?: string;
 }
 
-const defaultSuggestedMessages: SuggestedMessage[] = [
-  {
-    label: 'Summarize',
-    message: 'Summarize the transcript succinctly.',
-  },
-  {
-    label: 'Explain mistakes',
-    message: 'Explain mistakes the agent made, if there are any.',
-  },
-  {
-    label: 'Identify unusual behavior',
-    message:
-      'Identify any unusual or unexpected behavior on the part of the agent.',
-  },
-];
-
-const resultSpecificSuggestedMessages: SuggestedMessage[] = [
-  {
-    label: "Play devil's advocate",
-    message:
-      "Play devil's advocate. Is there a reasonable case to be made that the judge result is incorrect?",
-  },
-  {
-    label: 'Provide context for judge result',
-    message:
-      'Summarize the context leading up to the behavior relevant to the rubric.',
-  },
-  {
-    label: 'Explain judge result in more detail',
-    message:
-      'Walk through the rubric step by step and explain why the judge produced this result.',
-  },
-];
-
 export default function TranscriptChat({
   runId,
   collectionId: propCollectionId,
   judgeResult,
-  resultContext,
-  title = 'Transcript Chat',
+  suggestedMessages,
+  title,
   className = 'flex flex-col h-full space-y-2',
 }: TranscriptChatProps) {
   const params = useParams();
-  const router = useRouter();
+  const { t } = useLocale();
 
   // Use provided collectionId or extract from params
   const collectionId = propCollectionId || (params.collection_id as string);
@@ -165,9 +132,15 @@ export default function TranscriptChat({
     );
 
     return longerContextAvailable
-      ? 'Context window exceeded. Try a different model.'
-      : 'Context window exceeded.';
-  }, [errorMessage, estimatedInputTokens, availableChatModels, shownChatModel]);
+      ? t('chat.context.tryDifferentModel')
+      : t('chat.context.exceeded');
+  }, [
+    errorMessage,
+    estimatedInputTokens,
+    availableChatModels,
+    shownChatModel,
+    t,
+  ]);
 
   // Wrap sendMessage to include the selected chat model
   const onSendMessage = useCallback(
@@ -198,15 +171,48 @@ export default function TranscriptChat({
     onSendMessage(message);
   };
 
-  // Determine which suggested messages to use
-  const finalSuggestedMessages = judgeResult
-    ? resultSpecificSuggestedMessages
-    : defaultSuggestedMessages;
+  const defaultSuggestedMessages = useMemo<SuggestedMessage[]>(
+    () => [
+      {
+        label: t('chat.suggestion.summarize.label'),
+        message: t('chat.suggestion.summarize.prompt'),
+      },
+      {
+        label: t('chat.suggestion.explainMistakes.label'),
+        message: t('chat.suggestion.explainMistakes.prompt'),
+      },
+      {
+        label: t('chat.suggestion.unusualBehavior.label'),
+        message: t('chat.suggestion.unusualBehavior.prompt'),
+      },
+    ],
+    [t]
+  );
+  const resultSpecificSuggestedMessages = useMemo<SuggestedMessage[]>(
+    () => [
+      {
+        label: t('chat.suggestion.devilsAdvocate.label'),
+        message: t('chat.suggestion.devilsAdvocate.prompt'),
+      },
+      {
+        label: t('chat.suggestion.judgeContext.label'),
+        message: t('chat.suggestion.judgeContext.prompt'),
+      },
+      {
+        label: t('chat.suggestion.explainJudge.label'),
+        message: t('chat.suggestion.explainJudge.prompt'),
+      },
+    ],
+    [t]
+  );
+  const finalSuggestedMessages =
+    suggestedMessages ??
+    (judgeResult ? resultSpecificSuggestedMessages : defaultSuggestedMessages);
 
   const headerElement = (
     <ChatHeader
-      title={title}
-      description="Ask questions about the transcript (⌘K)"
+      title={title ?? t('chat.transcript.title')}
+      description={t('chat.transcript.description')}
       onReset={resetChat}
       canReset={sessionId !== null && messages.length > 0}
     />

@@ -8,7 +8,7 @@ import {
   PanelLeftOpen,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter, useParams, usePathname } from 'next/navigation';
+import { useParams, usePathname } from 'next/navigation';
 import { useSelector } from 'react-redux';
 
 import { BASE_DOCENT_PATH } from '@/app/constants';
@@ -28,12 +28,13 @@ import {
   toggleAgentRunLeftSidebar,
   toggleJudgeLeftSidebar,
 } from '../store/transcriptSlice';
+import { useLocale } from '../contexts/LocaleContext';
 
 const Breadcrumbs: React.FC = () => {
-  const router = useRouter();
   const params = useParams();
   const pathname = usePathname();
   const dispatch = useAppDispatch();
+  const { t } = useLocale();
 
   const collectionId = useSelector(
     (state: RootState) => state.collection.collectionId
@@ -77,8 +78,8 @@ const Breadcrumbs: React.FC = () => {
   const showSidebarToggles = isAgentRunView || isJudgeResultView;
 
   const collectionBreadcrumbText = collectionName
-    ? `Collection: ${collectionName}`
-    : 'Collection';
+    ? t('nav.collectionNamed', { name: collectionName })
+    : t('nav.collection');
 
   return (
     <div className="_Breadcrumbs text-sm flex items-center justify-between w-full">
@@ -98,7 +99,7 @@ const Breadcrumbs: React.FC = () => {
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>See all Collections</p>
+            <p>{t('nav.seeAllCollections')}</p>
           </TooltipContent>
         </Tooltip>
 
@@ -123,7 +124,7 @@ const Breadcrumbs: React.FC = () => {
             <>
               <ChevronRight size={18} />
               <span className="text-muted-foreground">
-                Agent run {agentRunId.split('-')[0]}
+                {t('nav.agentRun', { id: agentRunId.split('-')[0] })}
               </span>
             </>
           )}
@@ -136,10 +137,10 @@ const Breadcrumbs: React.FC = () => {
                   href={`${BASE_DOCENT_PATH}/${effectiveCollectionId}/rubric/${rubricId}`}
                   className="text-blue-text hover:underline"
                 >
-                  Rubric
+                  {t('nav.rubric')}
                 </Link>
               ) : (
-                <span className="text-muted-foreground">Rubric</span>
+                <span className="text-muted-foreground">{t('nav.rubric')}</span>
               )}
             </>
           )}
@@ -147,7 +148,9 @@ const Breadcrumbs: React.FC = () => {
           {refinementSessionId && (
             <>
               <ChevronRight size={18} />
-              <span className="text-muted-foreground">Refinement session</span>
+              <span className="text-muted-foreground">
+                {t('nav.refinementSession')}
+              </span>
             </>
           )}
 
@@ -155,7 +158,7 @@ const Breadcrumbs: React.FC = () => {
           {rubricId && resultId && (
             <>
               <ChevronRight size={18} />
-              <span className="text-muted-foreground">Result</span>
+              <span className="text-muted-foreground">{t('nav.result')}</span>
             </>
           )}
         </div>
@@ -173,7 +176,7 @@ const Breadcrumbs: React.FC = () => {
             className="flex items-center gap-x-2"
           >
             <BookText size={14} />
-            Docs
+            {t('nav.docs')}
           </Link>
         </Button>
 

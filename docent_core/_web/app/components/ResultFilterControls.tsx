@@ -22,6 +22,7 @@ import {
 import posthog from 'posthog-js';
 import { toast } from '@/hooks/use-toast';
 import { SchemaProperty } from '../types/schema';
+import { useLocale } from '../contexts/LocaleContext';
 
 interface FilterControlsProps {
   setIsPopoverOpen: (open: boolean) => void;
@@ -61,6 +62,7 @@ function reducer(state: FilterState, action: Action): FilterState {
 }
 
 function FilterControls({ setIsPopoverOpen }: FilterControlsProps) {
+  const { t } = useLocale();
   const { options, filters, setFilters, getValidOps, schema } =
     useResultFilterControls();
 
@@ -93,8 +95,8 @@ function FilterControls({ setIsPopoverOpen }: FilterControlsProps) {
     );
     if (existingFilter) {
       toast({
-        title: 'Filter already exists',
-        description: 'Please enter a different filter',
+        title: t('charts.filter.alreadyExists'),
+        description: t('charts.filter.enterDifferent'),
       });
     } else {
       setFilters([...filters, { path, op, value }]);
@@ -123,7 +125,7 @@ function FilterControls({ setIsPopoverOpen }: FilterControlsProps) {
         }}
       >
         <SelectTrigger className="h-7 text-xs bg-background font-mono text-muted-foreground">
-          <SelectValue placeholder="Select value" />
+          <SelectValue placeholder={t('charts.filter.selectValue')} />
         </SelectTrigger>
         <SelectContent>
           {options.map((opt) => (
@@ -140,7 +142,7 @@ function FilterControls({ setIsPopoverOpen }: FilterControlsProps) {
     <div className="grid grid-cols-[1fr_auto_1fr_auto] gap-1.5">
       <div>
         <div className="text-xs text-muted-foreground font-mono ml-1 mb-1">
-          Field
+          {t('charts.filter.field')}
         </div>
         <Select
           value={state.path}
@@ -153,7 +155,7 @@ function FilterControls({ setIsPopoverOpen }: FilterControlsProps) {
           }}
         >
           <SelectTrigger className="h-7 text-xs bg-background font-mono text-muted-foreground">
-            <SelectValue placeholder="Select field" />
+            <SelectValue placeholder={t('charts.filter.selectField')} />
           </SelectTrigger>
           <SelectContent>
             {options.map((k) => (
@@ -166,7 +168,7 @@ function FilterControls({ setIsPopoverOpen }: FilterControlsProps) {
       </div>
       <div>
         <div className="text-xs text-muted-foreground font-mono mr-1 mb-1">
-          Operator
+          {t('charts.filter.operator')}
         </div>
         <Select
           value={state.op}
@@ -179,7 +181,7 @@ function FilterControls({ setIsPopoverOpen }: FilterControlsProps) {
           }}
         >
           <SelectTrigger className="h-7 text-xs bg-background font-mono text-muted-foreground w-20">
-            <SelectValue placeholder="Select operator" />
+            <SelectValue placeholder={t('charts.filter.selectOperator')} />
           </SelectTrigger>
           <SelectContent>
             {getValidOps(state.path || '').map((o) => (
@@ -192,7 +194,7 @@ function FilterControls({ setIsPopoverOpen }: FilterControlsProps) {
       </div>
       <div>
         <div className="text-xs text-muted-foreground font-mono ml-1 mb-1">
-          Value
+          {t('charts.filter.value')}
         </div>
         {(() => {
           if (property?.type === 'string' && 'enum' in property)
@@ -204,7 +206,7 @@ function FilterControls({ setIsPopoverOpen }: FilterControlsProps) {
               onChange={(e) =>
                 dispatch({ type: 'setValue', value: e.target.value })
               }
-              placeholder="Enter value"
+              placeholder={t('charts.filter.enterValue')}
               className="h-7 text-xs bg-background font-mono text-muted-foreground w-full rounded border border-border px-2"
               ref={inputRef}
               onKeyDown={(e) => {
@@ -222,7 +224,7 @@ function FilterControls({ setIsPopoverOpen }: FilterControlsProps) {
           onClick={addFilter}
           disabled={!state.path || !state.op}
         >
-          Add Filter
+          {t('charts.filter.add')}
         </Button>
       </div>
     </div>
@@ -230,6 +232,7 @@ function FilterControls({ setIsPopoverOpen }: FilterControlsProps) {
 }
 
 export function ResultFilterControlsTrigger() {
+  const { t } = useLocale();
   const { filters } = useResultFilterControls();
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
 
@@ -245,13 +248,15 @@ export function ResultFilterControlsTrigger() {
           <FunnelPlus className="h-3 w-3" />
           {filters.length > 0 ? (
             <>
-              <span className="hidden xl:inline">Filters</span>
+              <span className="hidden xl:inline">
+                {t('charts.filter.filters')}
+              </span>
               <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">
                 {filters.length}
               </Badge>
             </>
           ) : (
-            <span className="hidden xl:inline">Add filter</span>
+            <span className="hidden xl:inline">{t('charts.filter.add')}</span>
           )}
         </Button>
       </PopoverTrigger>
@@ -263,6 +268,7 @@ export function ResultFilterControlsTrigger() {
 }
 
 export function ResultFilterControlsBadges() {
+  const { t } = useLocale();
   const { filters, setFilters, labeled, setLabeled } =
     useResultFilterControls();
 
@@ -278,9 +284,13 @@ export function ResultFilterControlsBadges() {
 
   return (
     <div className="flex flex-wrap gap-1.5 max-h-7 h-7 items-center">
-      <span className="text-xs text-muted-foreground">Filters:</span>
+      <span className="text-xs text-muted-foreground">
+        {t('charts.filter.filters')}:
+      </span>
       {!showFilters && (
-        <span className="text-xs text-muted-foreground font-mono">None</span>
+        <span className="text-xs text-muted-foreground font-mono">
+          {t('charts.filter.none')}
+        </span>
       )}
       {showFilters &&
         filters.map((f, idx) => (
@@ -298,7 +308,7 @@ export function ResultFilterControlsBadges() {
             <button
               onClick={() => removeFilter(idx)}
               className="p-0.5 text-primary hover:text-primary/50 transition-colors"
-              title="Remove filter"
+              title={t('charts.filter.remove')}
             >
               <X size={10} />
             </button>
@@ -306,11 +316,11 @@ export function ResultFilterControlsBadges() {
         ))}
       {labeled && (
         <div className="inline-flex items-center gap-x-1 text-xs bg-indigo-50 dark:bg-indigo-950/30 text-primary border border-indigo-200 dark:border-indigo-800 pl-1.5 pr-1 py-0.5 rounded-md">
-          <span className="font-mono">Show labeled</span>
+          <span className="font-mono">{t('charts.filter.showLabeled')}</span>
           <button
             onClick={() => setLabeled(false)}
             className="p-0.5 text-primary hover:text-primary/50 transition-colors"
-            title="Remove filter"
+            title={t('charts.filter.remove')}
           >
             <X size={10} />
           </button>
@@ -324,7 +334,7 @@ export function ResultFilterControlsBadges() {
           }}
           className="inline-flex items-center gap-x-1 text-xs bg-red-50 dark:bg-red-950/30 text-primary border border-red-200 dark:border-red-800 px-1.5 py-0.5 rounded-md hover:bg-red-100 dark:hover:bg-red-950/50 transition-colors"
         >
-          Clear
+          {t('charts.filter.clear')}
         </button>
       )}
     </div>

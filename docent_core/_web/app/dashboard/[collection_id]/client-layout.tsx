@@ -13,12 +13,14 @@ import { setCollectionId } from '../../store/collectionSlice';
 import { useAppDispatch } from '../../store/hooks';
 import { Button } from '@/components/ui/button';
 import { useUserContext } from '@/app/contexts/UserContext';
+import { useLocale } from '@/app/contexts/LocaleContext';
 
 export default function DocentDashboardClientLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const { t } = useLocale();
   const dispatch = useAppDispatch();
   const params = useParams();
   const collectionId = params.collection_id as string;
@@ -39,7 +41,11 @@ export default function DocentDashboardClientLayout({
 
   return (
     <div className="flex flex-col h-screen w-screen p-3 pt-2 space-y-2 min-h-0 min-w-[900px]">
-      <Suspense fallback={<div className="h-7">Loading breadcrumbs...</div>}>
+      <Suspense
+        fallback={
+          <div className="h-7">{t('results.access.loadingBreadcrumbs')}</div>
+        }
+      >
         <Breadcrumbs />
       </Suspense>
       {children}
@@ -50,6 +56,7 @@ export default function DocentDashboardClientLayout({
 export function PermissionDeniedPage() {
   const router = useRouter();
   const { user } = useUserContext();
+  const { t } = useLocale();
 
   const handleLoginRedirect = () => {
     // Capture the current URL to redirect back after login
@@ -62,16 +69,16 @@ export function PermissionDeniedPage() {
     <div className="min-h-screen flex flex-col items-center justify-center bg-secondary space-y-3">
       <div className="text-center">
         <div className="text-base font-semibold text-primary">
-          Access Denied
+          {t('results.access.deniedTitle')}
         </div>
         <div className="text-muted-foreground text-sm">
-          You don&apos;t have permission to view this resource
+          {t('results.access.deniedDescription')}
         </div>
       </div>
       <Button size="sm" onClick={handleLoginRedirect}>
         {user === null || user.is_anonymous
-          ? 'Login to your account'
-          : 'Back home'}
+          ? t('results.access.login')
+          : t('results.access.backHome')}
       </Button>
     </div>
   );
@@ -79,16 +86,19 @@ export function PermissionDeniedPage() {
 
 export function NotFoundPage() {
   const router = useRouter();
+  const { t } = useLocale();
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-secondary space-y-3">
       <div className="text-center">
-        <div className="text-base font-semibold text-primary">Not Found</div>
+        <div className="text-base font-semibold text-primary">
+          {t('results.access.notFoundTitle')}
+        </div>
         <div className="text-muted-foreground text-sm">
-          The resource you are looking for does not exist.
+          {t('results.access.notFoundDescription')}
         </div>
       </div>
       <Button size="sm" onClick={() => router.push('/')}>
-        Back home
+        {t('results.access.backHome')}
       </Button>
     </div>
   );

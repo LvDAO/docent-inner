@@ -1,3 +1,5 @@
+'use client';
+
 import {
   RubricCentroid,
   useGetClusteringStateQuery,
@@ -5,6 +7,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import { Share } from 'lucide-react';
+import { useLocale } from '@/app/contexts/LocaleContext';
 
 interface ShareRubricButtonProps {
   rubricId: string;
@@ -17,6 +20,7 @@ export default function ShareRubricButton({
   collectionId,
   pollingInterval = 0,
 }: ShareRubricButtonProps) {
+  const { t } = useLocale();
   const { centroidsMap } = useGetClusteringStateQuery(
     {
       collectionId,
@@ -50,14 +54,14 @@ export default function ShareRubricButton({
       await navigator.clipboard.writeText(currentUrl.toString());
 
       toast({
-        title: 'Link copied',
-        description: 'Rubric link copied to clipboard',
+        title: t('misc.rubric.linkCopied'),
+        description: t('misc.rubric.linkCopiedDescription'),
       });
     } catch (error) {
       console.error('Failed to copy link:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to copy link to clipboard',
+        title: t('misc.rubric.copyLinkFailedTitle'),
+        description: t('misc.rubric.copyLinkFailedDescription'),
         variant: 'destructive',
       });
     }
@@ -70,6 +74,8 @@ export default function ShareRubricButton({
       size="icon"
       className="gap-1 h-7 w-7 text-muted-foreground text-xs"
       onClick={handleShare}
+      title={t('misc.rubric.share')}
+      aria-label={t('misc.rubric.share')}
     >
       <Share size={14} />
     </Button>

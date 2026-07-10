@@ -4,6 +4,7 @@ import {
   useCancelEvaluationMutation,
 } from '@/app/api/rubricApi';
 import { useRubricVersion } from '@/providers/use-rubric-version';
+import { useLocale } from '@/app/contexts/LocaleContext';
 import {
   Tooltip,
   TooltipContent,
@@ -23,6 +24,7 @@ const RunRubricButton = ({
   rubricJobId,
   hasUnsavedChanges,
 }: RunRubricButtonProps) => {
+  const { t } = useLocale();
   const [startEvaluation, { isLoading: isStartingEvaluation }] =
     useStartEvaluationMutation();
   const [cancelEvaluation, { isLoading: isCancellingEvaluation }] =
@@ -60,7 +62,9 @@ const RunRubricButton = ({
         disabled={isButtonDisabled}
         onClick={handleStartRubricJob}
       >
-        {isStartingEvaluation ? 'Starting rubric...' : 'Run rubric'}
+        {isStartingEvaluation
+          ? t('analysis.run.starting')
+          : t('analysis.run.run')}
       </Button>
     );
   };
@@ -74,7 +78,9 @@ const RunRubricButton = ({
         disabled={isCancellingEvaluation}
         onClick={handleCancelRubricJob}
       >
-        {isCancellingEvaluation ? 'Stopping rubric...' : 'Stop rubric'}
+        {isCancellingEvaluation
+          ? t('analysis.run.stopping')
+          : t('analysis.run.stop')}
       </Button>
     );
   }
@@ -88,7 +94,7 @@ const RunRubricButton = ({
           </div>
         </TooltipTrigger>
         <TooltipContent side="bottom">
-          <p>Switch to the latest version to run.</p>
+          <p>{t('analysis.run.latestVersionRequired')}</p>
         </TooltipContent>
       </Tooltip>
     );

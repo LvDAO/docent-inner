@@ -1,3 +1,5 @@
+'use client';
+
 import { Settings2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -7,6 +9,7 @@ import {
 } from '@/components/ui/popover';
 import { ModelOption } from '@/app/store/rubricSlice';
 import ModelPicker from '@/components/ModelPicker';
+import { useLocale } from '@/app/contexts/LocaleContext';
 
 interface SettingsPopoverProps {
   judgeModel: ModelOption;
@@ -21,6 +24,7 @@ export default function SettingsPopover({
   onChange,
   editable = true,
 }: SettingsPopoverProps) {
+  const { t } = useLocale();
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -28,7 +32,7 @@ export default function SettingsPopover({
           variant="ghost"
           size="icon"
           className="h-7 w-7 hover:bg-accent transition-all duration-200 text-muted-foreground hover:text-primary"
-          title="Settings"
+          title={t('misc.rubric.settings')}
           disabled={!editable}
         >
           <Settings2 className="h-4 w-4" />
@@ -41,7 +45,7 @@ export default function SettingsPopover({
       >
         <div className="flex flex-col">
           <label className="block text-xs font-medium text-muted-foreground mb-1">
-            Judge Model
+            {t('misc.rubric.judgeModel')}
           </label>
           <ModelPicker
             selectedModel={judgeModel}

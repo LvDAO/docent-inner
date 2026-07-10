@@ -8,6 +8,7 @@ import {
 } from '@/app/types/transcriptTypes';
 import { MarkdownWithCitations } from '@/components/CitationRenderer';
 import ToolCallMessage from './ToolCallMessage';
+import { useLocale } from '@/app/contexts/LocaleContext';
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -29,6 +30,7 @@ export function ChatMessage({
   requiresScrollPadding,
   isStreaming = false,
 }: ChatMessageProps) {
+  const { t } = useLocale();
   const isStreamingThisMessage = !!isStreaming;
 
   // No per-tool expansion state here; handled inside ToolCallMessage
@@ -53,9 +55,9 @@ export function ChatMessage({
       <div className="mt-1 p-1.5 bg-secondary/85 rounded text-xs break-all whitespace-pre-wrap">
         <div className="text-[10px] text-muted-foreground mb-0.5">
           {message.tool_call_id ? (
-            <>Tool Call ID: {message.tool_call_id}</>
+            <>{t('chat.tool.callId', { id: message.tool_call_id })}</>
           ) : (
-            <>Tool Message</>
+            <>{t('chat.tool.message')}</>
           )}
         </div>
         <div className="font-mono">
@@ -64,7 +66,7 @@ export function ChatMessage({
           )}
           {message.error && (
             <div className="mt-1 text-red-text">
-              Error: {message.error.message}
+              {t('chat.tool.error', { message: message.error.message })}
             </div>
           )}
         </div>

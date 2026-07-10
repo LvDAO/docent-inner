@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { RubricCentroid } from '@/app/api/rubricApi';
 import { useRefinementTab } from '@/providers/use-refinement-tab';
 import { useParams, useRouter } from 'next/navigation';
+import { useLocale } from '@/app/contexts/LocaleContext';
 
 interface JudgeResultsListProps {
   centroids: RubricCentroid[];
@@ -30,6 +31,7 @@ export const JudgeResultsList = ({
   isClusteringActive,
   activeResultId,
 }: JudgeResultsListProps) => {
+  const { t } = useLocale();
   const { applyFilters, labeled } = useResultFilterControls();
   const filteredJudgeResultsList = useMemo(
     () => applyFilters(judgeResults, judgeRunLabels),
@@ -83,11 +85,15 @@ export const JudgeResultsList = ({
         .filter(Boolean) as JudgeResultWithCitations[];
       return {
         id: centroid.id,
-        title: centroid.centroid || `Cluster ${centroid.id.slice(0, 8)}`,
+        title:
+          centroid.centroid ||
+          t('results.section.clusterFallback', {
+            id: centroid.id.slice(0, 8),
+          }),
         resultsByAgentRun: groupByAgentRun(results),
       };
     });
-  }, [centroids, assignments, judgeResultsMap, groupByAgentRun]);
+  }, [centroids, assignments, judgeResultsMap, groupByAgentRun, t]);
 
   // Create residual section
   const residualSection = useMemo(() => {
@@ -97,7 +103,10 @@ export const JudgeResultsList = ({
     if (residualResults.length === 0) return null;
     return {
       id: 'residuals',
-      title: centroids.length > 0 ? 'Residuals' : 'Results',
+      title:
+        centroids.length > 0
+          ? t('results.section.residuals')
+          : t('results.section.results'),
       resultsByAgentRun: groupByAgentRun(residualResults),
     } as {
       id: string;
@@ -109,6 +118,7 @@ export const JudgeResultsList = ({
     assignedResultIdsSet,
     centroids.length,
     groupByAgentRun,
+    t,
   ]);
 
   // Create a map of labeled agent run ids
@@ -197,6 +207,7 @@ export const ResultsSection = ({
   navToTranscriptOnClick = true,
   activeResultId,
 }: ResultsSectionProps) => {
+  const { t } = useLocale();
   const [expanded, setExpanded] = useState<boolean>(!sectionTitle);
   const uniqueRuns = useMemo(
     () => Object.keys(resultsByAgentRun).length,
@@ -238,7 +249,7 @@ export const ResultsSection = ({
           )}
           <div className="flex-shrink-0 flex items-center">
             <span className="text-xs px-1.5 py-0.5 rounded-sm bg-secondary text-muted-foreground flex items-center min-w-[2rem] justify-center">
-              {`${uniqueRuns} runs`}
+              {t('results.section.runCount', { count: uniqueRuns })}
               {isClusteringActive && (
                 <Loader2 className="h-3 w-3 animate-spin ml-1" />
               )}
@@ -256,7 +267,11 @@ export const ResultsSection = ({
             <div key={agentRunId} className="group px-0">
               <div className="space-y-2 pb-2">
                 <div className="text-xs px-2 bg-secondary text-muted-foreground justify-between py-1 font-medium rounded-sm flex items-center">
-                  <span>Agent Run {agentRunId.slice(0, 8)}</span>
+                  <span>
+                    {t('results.section.agentRun', {
+                      id: agentRunId.slice(0, 8),
+                    })}
+                  </span>
                   {results.length > 0 && navToTranscriptOnClick && (
                     <button
                       className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:text-primary"
@@ -264,7 +279,7 @@ export const ResultsSection = ({
                         e.stopPropagation();
                         handleNavigateToLabeling(results[0]);
                       }}
-                      title="Open labeling area"
+                      title={t('results.section.openLabeling')}
                     >
                       <Tag size={14} />
                     </button>

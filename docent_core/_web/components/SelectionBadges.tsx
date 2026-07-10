@@ -6,6 +6,7 @@ import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TextSelectionItem } from '@/providers/use-text-selection';
 import { toast } from '@/hooks/use-toast';
+import { useLocale } from '@/app/contexts/LocaleContext';
 
 interface SelectionBadgesProps {
   selections: TextSelectionItem[];
@@ -20,6 +21,7 @@ export default function SelectionBadges({
   onNavigate,
   className,
 }: SelectionBadgesProps) {
+  const { t } = useLocale();
   if (!selections || selections.length === 0) return null;
 
   return (
@@ -58,7 +60,7 @@ export default function SelectionBadges({
             </span>
             <button
               type="button"
-              aria-label="Remove selection"
+              aria-label={t('chat.selection.remove')}
               className="rounded p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
               onClick={(e) => {
                 e.preventDefault();
@@ -68,8 +70,8 @@ export default function SelectionBadges({
                   window.getSelection()?.removeAllRanges();
                 } catch {
                   toast({
-                    title: 'Error',
-                    description: 'Failed to remove selection',
+                    title: t('common.error'),
+                    description: t('chat.selection.removeFailed'),
                     variant: 'destructive',
                   });
                 }

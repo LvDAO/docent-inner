@@ -18,6 +18,7 @@ import React, {
 } from 'react';
 
 import { useAppDispatch, useAppSelector } from '@/app/store/hooks';
+import { useLocale } from '@/app/contexts/LocaleContext';
 import {
   clearHighlightedCitation,
   selectRunCitationsById,
@@ -215,6 +216,7 @@ const TranscriptPath: React.FC<{
 const AgentRunViewer = forwardRef<AgentRunViewerHandle, AgentRunViewerProps>(
   ({ agentRunId }, ref) => {
     const dispatch = useAppDispatch();
+    const { t } = useLocale();
 
     const collectionId = useAppSelector(
       (state) => state.collection?.collectionId
@@ -795,7 +797,7 @@ const AgentRunViewer = forwardRef<AgentRunViewerHandle, AgentRunViewerProps>(
               <div className="flex items-center justify-between space-x-1">
                 <div className="flex items-center space-x-1">
                   <div className="font-semibold text-sm shrink-0">
-                    Agent Run
+                    {t('analysis.viewer.agentRun')}
                   </div>
                   <UuidPill uuid={agentRun?.id} />
                   {agentRun && (
@@ -806,7 +808,9 @@ const AgentRunViewer = forwardRef<AgentRunViewerHandle, AgentRunViewerProps>(
                       }
                     >
                       <MetadataPopover.DefaultTrigger />
-                      <MetadataPopover.Content title="Agent Run Metadata">
+                      <MetadataPopover.Content
+                        title={t('analysis.viewer.agentRunMetadata')}
+                      >
                         <MetadataPopover.Body metadata={agentRun.metadata}>
                           {(md) => (
                             <MetadataBlock
@@ -919,7 +923,9 @@ const AgentRunViewer = forwardRef<AgentRunViewerHandle, AgentRunViewerProps>(
                           <button
                             onClick={() => setSidebarVisible(false)}
                             className="p-1 rounded text-muted-foreground hover:text-primary hover:bg-muted transition-colors"
-                            aria-label="Hide transcript hierarchy"
+                            aria-label={t(
+                              'analysis.viewer.hideTranscriptHierarchy'
+                            )}
                           >
                             <FolderTree className="h-4 w-4" />
                           </button>
@@ -961,14 +967,16 @@ const AgentRunViewer = forwardRef<AgentRunViewerHandle, AgentRunViewerProps>(
                                     setSidebarVisible(!sidebarVisible)
                                   }
                                   className="p-1 rounded text-muted-foreground hover:text-primary hover:bg-muted transition-colors"
-                                  aria-label="Show transcript hierarchy"
+                                  aria-label={t(
+                                    'analysis.viewer.showTranscriptHierarchy'
+                                  )}
                                 >
                                   <FolderTree className="h-4 w-4" />
                                 </button>
                               </div>
                             )}
                           <div className="font-semibold text-sm">
-                            Transcript
+                            {t('analysis.viewer.transcript')}
                           </div>
                           <UuidPill uuid={selectedTranscriptId} />
                           {(() => {
@@ -997,7 +1005,9 @@ const AgentRunViewer = forwardRef<AgentRunViewerHandle, AgentRunViewerProps>(
                               >
                                 <MetadataPopover.DefaultTrigger />
                                 <MetadataPopover.Content
-                                  title={`Transcript Metadata`}
+                                  title={t(
+                                    'analysis.viewer.transcriptMetadata'
+                                  )}
                                 >
                                   <MetadataPopover.Body
                                     metadata={
@@ -1096,7 +1106,7 @@ const AgentRunViewer = forwardRef<AgentRunViewerHandle, AgentRunViewerProps>(
                       <button
                         onClick={goToPrevBlock}
                         className="p-1.5 hover:bg-accent transition-colors rounded-t-md"
-                        title="Previous block"
+                        title={t('analysis.viewer.previousBlock')}
                       >
                         <ChevronUp className="h-4 w-4 text-muted-foreground" />
                       </button>
@@ -1104,7 +1114,7 @@ const AgentRunViewer = forwardRef<AgentRunViewerHandle, AgentRunViewerProps>(
                       <button
                         onClick={goToNextBlock}
                         className="p-1.5 hover:bg-accent transition-colors rounded-b-md"
-                        title="Next block"
+                        title={t('analysis.viewer.nextBlock')}
                       >
                         <ChevronDown className="h-4 w-4 text-muted-foreground" />
                       </button>
@@ -1122,14 +1132,14 @@ const AgentRunViewer = forwardRef<AgentRunViewerHandle, AgentRunViewerProps>(
                 <AlertCircle className="h-4 w-4" />
                 <span className="text-sm font-medium">
                   {isNotFound
-                    ? 'Agent run not found'
-                    : 'Failed to load agent run'}
+                    ? t('analysis.viewer.agentRunNotFound')
+                    : t('analysis.viewer.agentRunLoadFailed')}
                 </span>
               </div>
               <div className="text-xs text-muted-foreground">
                 {isNotFound
-                  ? 'The requested agent run does not exist or you do not have access.'
-                  : 'Please try again.'}
+                  ? t('analysis.viewer.agentRunNotFoundDescription')
+                  : t('analysis.viewer.tryAgain')}
               </div>
             </div>
           </div>

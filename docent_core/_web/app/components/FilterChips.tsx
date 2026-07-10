@@ -7,6 +7,7 @@ import {
   ComplexFilter,
 } from '@/app/types/collectionTypes';
 import { cn } from '@/lib/utils';
+import { useLocale } from '../contexts/LocaleContext';
 
 interface FilterChipsProps {
   filters: ComplexFilter | undefined | null;
@@ -27,6 +28,7 @@ export const FilterChips = ({
   className,
   disabled = false,
 }: FilterChipsProps) => {
+  const { t } = useLocale();
   const currentFilters = filters?.filters || [];
 
   if (currentFilters.length === 0) {
@@ -71,13 +73,17 @@ export const FilterChips = ({
                   </>
                 );
               } else {
-                return `${subFilter.type} filter`;
+                return t('charts.filter.typed', { type: subFilter.type });
               }
             })()}
             <button
               onClick={() => onToggleFilter(subFilter.id)}
               className="p-0.5 text-current hover:text-current/60 transition-colors"
-              title={isDisabled ? 'Enable filter' : 'Disable filter'}
+              title={
+                isDisabled
+                  ? t('charts.filter.enable')
+                  : t('charts.filter.disable')
+              }
               disabled={disabled}
             >
               {isDisabled ? <Eye size={10} /> : <EyeOff size={10} />}
@@ -86,7 +92,7 @@ export const FilterChips = ({
               <button
                 onClick={() => onEditFilter(subFilter as PrimitiveFilter)}
                 className="p-0.5 text-current hover:text-current/60 transition-colors"
-                title="Edit filter"
+                title={t('charts.filter.edit')}
                 disabled={disabled}
               >
                 <Pencil size={10} />
@@ -95,7 +101,7 @@ export const FilterChips = ({
             <button
               onClick={() => onRemoveFilter(subFilter.id)}
               className="p-0.5 text-current hover:text-current/60 transition-colors"
-              title="Remove filter"
+              title={t('charts.filter.remove')}
               disabled={disabled}
             >
               <CircleX size={10} />
@@ -108,7 +114,7 @@ export const FilterChips = ({
         className="inline-flex items-center gap-x-1 text-[11px] bg-red-bg text-primary border border-red-border px-1.5 py-0.5 rounded-md hover:bg-red-bg/50 transition-colors"
         disabled={disabled}
       >
-        Clear All
+        {t('charts.filter.clearAll')}
         <Eraser size={10} />
       </button>
     </div>

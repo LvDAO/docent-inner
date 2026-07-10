@@ -12,6 +12,7 @@ import { useGetChartDataQuery } from '../api/chartApi';
 import { useChartFilters } from '../../hooks/use-chart-filters';
 import { CustomBarTooltip, CustomLineTooltip } from './CustomTooltips';
 import { Loader2 } from 'lucide-react';
+import { useLocale } from '../contexts/LocaleContext';
 
 type GraphValue = string | number;
 
@@ -20,6 +21,7 @@ export interface GraphDatum {
 }
 
 export default function Chart({ chart }: { chart: ChartSpec }) {
+  const { t } = useLocale();
   const collectionId = useAppSelector((state) => state.collection.collectionId);
   const { handleCellClick } = useChartFilters(collectionId);
 
@@ -67,7 +69,7 @@ export default function Chart({ chart }: { chart: ChartSpec }) {
   if (error) {
     return (
       <div className="flex items-center justify-center p-4 text-sm">
-        Error loading chart
+        {t('charts.chart.errorLoading')}
       </div>
     );
   }

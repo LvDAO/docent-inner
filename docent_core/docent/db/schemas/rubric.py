@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     DateTime,
     Enum,
     ForeignKey,
@@ -28,6 +29,10 @@ from docent_core.docent.ai_tools.rubric.rubric import (
     JudgeRunLabel,
     ResultType,
     Rubric,
+)
+from docent_core.docent.db.schemas.auth_models import (
+    DEFAULT_PREFERRED_LOCALE,
+    SupportedLocale,
 )
 from docent_core.docent.db.schemas.tables import TABLE_AGENT_RUN, TABLE_COLLECTION
 
@@ -162,6 +167,13 @@ class SQLAJudgeResult(SQLABase):
     )
     rubric_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     rubric_version: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    locale: Mapped[SupportedLocale] = mapped_column(
+        String(16),
+        nullable=False,
+        default=DEFAULT_PREFERRED_LOCALE,
+        server_default=DEFAULT_PREFERRED_LOCALE,
+        index=True,
+    )
 
     # Deprecated
     value: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -174,6 +186,10 @@ class SQLAJudgeResult(SQLABase):
         ForeignKeyConstraint(
             ["rubric_id", "rubric_version"],
             [f"{TABLE_RUBRIC}.id", f"{TABLE_RUBRIC}.version"],
+        ),
+        CheckConstraint(
+            "locale IN ('en', 'zh-CN')",
+            name="check_judge_results_locale",
         ),
     )
 
@@ -192,12 +208,17 @@ class SQLAJudgeResult(SQLABase):
     # Relationship to result labels removed; labels are tied to agent_run_id now
 
     @classmethod
-    def from_pydantic(cls, judge_result: JudgeResult) -> "SQLAJudgeResult":
+    def from_pydantic(
+        cls,
+        judge_result: JudgeResult,
+        locale: SupportedLocale = DEFAULT_PREFERRED_LOCALE,
+    ) -> "SQLAJudgeResult":
         return cls(
             id=judge_result.id,
             agent_run_id=judge_result.agent_run_id,
             rubric_id=judge_result.rubric_id,
             rubric_version=judge_result.rubric_version,
+            locale=locale,
             value=judge_result.value,
             result_type=judge_result.result_type,
             output=judge_result.output,
@@ -224,6 +245,13 @@ class SQLARubricCentroid(SQLABase):
     )
     rubric_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     rubric_version: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    locale: Mapped[SupportedLocale] = mapped_column(
+        String(16),
+        nullable=False,
+        default=DEFAULT_PREFERRED_LOCALE,
+        server_default=DEFAULT_PREFERRED_LOCALE,
+        index=True,
+    )
     centroid: Mapped[str] = mapped_column(Text, nullable=False)
     result_type: Mapped[ResultType] = mapped_column(Enum(ResultType), nullable=False)
 
@@ -232,6 +260,10 @@ class SQLARubricCentroid(SQLABase):
         ForeignKeyConstraint(
             ["rubric_id", "rubric_version"],
             [f"{TABLE_RUBRIC}.id", f"{TABLE_RUBRIC}.version"],
+        ),
+        CheckConstraint(
+            "locale IN ('en', 'zh-CN')",
+            name="check_rubric_centroids_locale",
         ),
     )
 

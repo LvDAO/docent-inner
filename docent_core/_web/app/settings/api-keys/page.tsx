@@ -32,6 +32,7 @@ import { Badge } from '@/components/ui/badge';
 import { Copy, Plus, Trash2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { apiRestClient } from '@/app/services/apiService';
+import { useLocale } from '@/app/contexts/LocaleContext';
 
 interface ApiKey {
   id: string;
@@ -50,6 +51,7 @@ interface CreateApiKeyResponse {
 }
 
 export default function ApiKeysPage() {
+  const { locale, t } = useLocale();
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -65,8 +67,8 @@ export default function ApiKeysPage() {
     } catch (error) {
       console.error('Failed to fetch API keys:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to load API keys',
+        title: t('common.error'),
+        description: t('apiKeys.loadFailed'),
         variant: 'destructive',
       });
     } finally {
@@ -94,15 +96,14 @@ export default function ApiKeysPage() {
       await fetchApiKeys();
 
       toast({
-        title: 'API Key Created',
-        description:
-          'Your new API key has been created. Make sure to copy it now!',
+        title: t('apiKeys.createdToast'),
+        description: t('apiKeys.createdToastDescription'),
       });
     } catch (error) {
       console.error('Failed to create API key:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to create API key',
+        title: t('common.error'),
+        description: t('apiKeys.createFailed'),
         variant: 'destructive',
       });
     } finally {
@@ -115,14 +116,14 @@ export default function ApiKeysPage() {
       await apiRestClient.delete(`/api-keys/${keyId}`);
       await fetchApiKeys();
       toast({
-        title: 'API Key Disabled',
-        description: 'The API key has been disabled successfully',
+        title: t('apiKeys.disabledToast'),
+        description: t('apiKeys.disabledToastDescription'),
       });
     } catch (error) {
       console.error('Failed to disable API key:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to disable API key',
+        title: t('common.error'),
+        description: t('apiKeys.disableFailed'),
         variant: 'destructive',
       });
     }
@@ -132,57 +133,53 @@ export default function ApiKeysPage() {
     try {
       await navigator.clipboard.writeText(text);
       toast({
-        title: 'Copied',
-        description: 'API key copied to clipboard',
+        title: t('apiKeys.copied'),
+        description: t('apiKeys.copiedDescription'),
       });
     } catch (error) {
       console.error('Failed to copy to clipboard:', error);
       toast({
-        title: 'Copy Failed',
-        description:
-          'Failed to copy API key to clipboard. Please copy manually.',
+        title: t('apiKeys.copyFailed'),
+        description: t('apiKeys.copyFailedDescription'),
         variant: 'destructive',
       });
     }
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString();
+    return new Date(dateString).toLocaleDateString(locale);
   };
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Docent API Keys</h1>
-          <p className="text-muted-foreground">
-            Manage your API keys for programmatic access to Docent
-          </p>
+          <h1 className="text-3xl font-bold">{t('apiKeys.title')}</h1>
+          <p className="text-muted-foreground">{t('apiKeys.description')}</p>
         </div>
 
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
-              Create API Key
+              {t('apiKeys.create')}
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Create New API Key</DialogTitle>
+              <DialogTitle>{t('apiKeys.createTitle')}</DialogTitle>
               <DialogDescription>
-                Give your API key a descriptive name to help you identify it
-                later.
+                {t('apiKeys.createDescription')}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label htmlFor="keyName">API Key Name</Label>
+                <Label htmlFor="keyName">{t('apiKeys.name')}</Label>
                 <Input
                   id="keyName"
                   value={newKeyName}
                   onChange={(e) => setNewKeyName(e.target.value)}
-                  placeholder="e.g., Production Server, Local Development"
+                  placeholder={t('apiKeys.namePlaceholder')}
                 />
               </div>
             </div>
@@ -191,13 +188,13 @@ export default function ApiKeysPage() {
                 variant="outline"
                 onClick={() => setIsCreateDialogOpen(false)}
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button
                 onClick={handleCreateApiKey}
                 disabled={isCreating || !newKeyName.trim()}
               >
-                {isCreating ? 'Creating...' : 'Create API Key'}
+                {isCreating ? t('apiKeys.creating') : t('apiKeys.create')}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -208,11 +205,10 @@ export default function ApiKeysPage() {
         <Card className="border-green-border bg-green-bg">
           <CardHeader>
             <CardTitle className="text-green-text">
-              API Key Created Successfully!
+              {t('apiKeys.createdSuccess')}
             </CardTitle>
             <CardDescription className="text-green-text">
-              Make sure to copy your API key now. You won&apos;t be able to see
-              it again.
+              {t('apiKeys.copyNow')}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -227,12 +223,13 @@ export default function ApiKeysPage() {
                   className="h-7"
                   onClick={() => setNewlyCreatedKey(null)}
                 >
-                  I&apos;ve copied the key
+                  {t('apiKeys.copiedButton')}
                 </Button>
                 <Button
                   size="sm"
                   className="h-7 w-7 !p-0"
                   onClick={() => copyToClipboard(newlyCreatedKey.api_key)}
+                  aria-label={t('apiKeys.copy')}
                 >
                   <Copy size={11} />
                 </Button>
@@ -244,27 +241,25 @@ export default function ApiKeysPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Your API Keys</CardTitle>
-          <CardDescription>
-            These API keys allow access to the Docent API. Keep them secure.
-          </CardDescription>
+          <CardTitle>{t('apiKeys.yourKeys')}</CardTitle>
+          <CardDescription>{t('apiKeys.securityDescription')}</CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div>Loading...</div>
+            <div>{t('common.loading')}</div>
           ) : apiKeys.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              No API keys found. Create your first API key to get started.
+              {t('apiKeys.empty')}
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Last Used</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead>{t('common.name')}</TableHead>
+                  <TableHead>{t('common.status')}</TableHead>
+                  <TableHead>{t('common.created')}</TableHead>
+                  <TableHead>{t('apiKeys.lastUsed')}</TableHead>
+                  <TableHead>{t('common.actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -273,14 +268,16 @@ export default function ApiKeysPage() {
                     <TableCell className="font-medium">{key.name}</TableCell>
                     <TableCell>
                       <Badge variant={key.is_active ? 'default' : 'secondary'}>
-                        {key.is_active ? 'Active' : 'Disabled'}
+                        {key.is_active
+                          ? t('apiKeys.active')
+                          : t('apiKeys.disabled')}
                       </Badge>
                     </TableCell>
                     <TableCell>{formatDate(key.created_at)}</TableCell>
                     <TableCell>
                       {key.last_used_at
                         ? formatDate(key.last_used_at)
-                        : 'Never'}
+                        : t('common.never')}
                     </TableCell>
                     <TableCell>
                       {key.is_active && (
@@ -288,6 +285,7 @@ export default function ApiKeysPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => handleDisableApiKey(key.id)}
+                          aria-label={t('apiKeys.disable')}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>

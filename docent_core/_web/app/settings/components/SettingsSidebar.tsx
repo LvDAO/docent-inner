@@ -3,7 +3,8 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { ArrowLeft, Key, Brain } from 'lucide-react';
+import { ArrowLeft, Key, Brain, Languages } from 'lucide-react';
+import { useLocale } from '@/app/contexts/LocaleContext';
 
 interface SidebarItem {
   id: string;
@@ -12,24 +13,30 @@ interface SidebarItem {
   icon: React.ComponentType<{ className?: string }>;
 }
 
-const sidebarItems: SidebarItem[] = [
-  {
-    id: 'api-keys',
-    label: 'Docent API Keys',
-    href: '/settings/api-keys',
-    icon: Key,
-  },
-  {
-    id: 'model-providers',
-    label: 'Model Providers',
-    href: '/settings/model-providers',
-    icon: Brain,
-  },
-];
-
 export default function SettingsSidebar() {
   const router = useRouter();
   const pathname = usePathname();
+  const { t } = useLocale();
+  const sidebarItems: SidebarItem[] = [
+    {
+      id: 'api-keys',
+      label: t('settings.apiKeys'),
+      href: '/settings/api-keys',
+      icon: Key,
+    },
+    {
+      id: 'model-providers',
+      label: t('settings.modelProviders'),
+      href: '/settings/model-providers',
+      icon: Brain,
+    },
+    {
+      id: 'language',
+      label: t('settings.language'),
+      href: '/settings/language',
+      icon: Languages,
+    },
+  ];
 
   return (
     <div className="w-64 space-y-6">
@@ -41,12 +48,12 @@ export default function SettingsSidebar() {
           className="flex items-center space-x-2"
         >
           <ArrowLeft className="h-4 w-4" />
-          <span>Back to Dashboard</span>
+          <span>{t('settings.backToDashboard')}</span>
         </Button>
       </div>
 
       <div>
-        <h1 className="text-2xl font-bold mb-2">Settings</h1>
+        <h1 className="text-2xl font-bold mb-2">{t('settings.title')}</h1>
       </div>
 
       <Card className="p-4">

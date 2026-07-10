@@ -30,6 +30,7 @@ import { useTheme } from 'next-themes';
 import CodeMirror from '@uiw/react-codemirror';
 import ModelPicker from '@/components/ModelPicker';
 import { Separator } from '@/components/ui/separator';
+import { useLocale } from '@/app/contexts/LocaleContext';
 
 // Hardcoded fix for types that should be formatted differently, e.g. enum strings for maybe date strings
 const fixTypePreview = (property: Record<string, any>) => {
@@ -46,11 +47,13 @@ function DescriptionInlineDiff({
   previous: string;
   current: string;
 }) {
+  const { t } = useLocale();
+
   if (previous === current) {
     return (
       <div className="rounded-sm border-0 bg-background p-2">
         <div className="text-[11px] uppercase text-muted-foreground mb-1">
-          No changes from previous version
+          {t('analysis.editor.noChanges')}
         </div>
         <div className="text-sm whitespace-pre-wrap break-words">{current}</div>
       </div>
@@ -153,6 +156,7 @@ export default function RubricEditor({
   onHasUnsavedChangesUpdated,
   shouldConfirmOnSave,
 }: RubricEditorProps) {
+  const { t } = useLocale();
   const isDisabled = !editable;
 
   const dispatch = useAppDispatch();
@@ -282,7 +286,12 @@ export default function RubricEditor({
         parsedSchema = JSON.parse(schemaText);
       } catch (e) {
         setSchemaError(
-          `Invalid JSON: ${e instanceof Error ? e.message : 'Unknown error'}`
+          t('analysis.editor.invalidJson', {
+            error:
+              e instanceof Error
+                ? e.message
+                : t('analysis.editor.unknownError'),
+          })
         );
         return;
       }
@@ -359,10 +368,14 @@ export default function RubricEditor({
       <div className="flex justify-between">
         <div className="items-center flex flex-col">
           <div className="text-sm font-semibold">
-            {editable ? 'Rubric Editor' : 'Rubric Evaluation'}
+            {editable
+              ? t('analysis.editor.title')
+              : t('analysis.editor.evaluationTitle')}
           </div>
           <div className="text-xs text-muted-foreground">
-            {editable ? 'Specify a rubric.' : 'Explore rubric results.'}
+            {editable
+              ? t('analysis.editor.description')
+              : t('analysis.editor.evaluationDescription')}
           </div>
         </div>
 
@@ -394,7 +407,7 @@ export default function RubricEditor({
                 htmlFor="load-prev-rubric"
                 className="text-xs text-muted-foreground whitespace-nowrap"
               >
-                Show diff
+                {t('analysis.editor.showDiff')}
               </Label>
             </div>
           )}
@@ -407,6 +420,7 @@ export default function RubricEditor({
                 className="h-4 w-4 p-0 hover:bg-background/50"
                 onClick={handleVersionDecrement}
                 disabled={!rubric || rubric.version <= minVersion}
+                aria-label={t('analysis.editor.previousVersion')}
               >
                 <ChevronLeft className="h-2.5 w-2.5" />
               </Button>
@@ -427,6 +441,7 @@ export default function RubricEditor({
                   maxVersion === undefined ||
                   rubric.version >= maxVersion
                 }
+                aria-label={t('analysis.editor.nextVersion')}
               >
                 <ChevronRight className="h-2.5 w-2.5" />
               </Button>
@@ -448,7 +463,7 @@ export default function RubricEditor({
                 className={cn(
                   'h-[30vh] max-h-[50vh] resize-y border-0 p-2 shadow-none focus-visible:ring-0 text-sm custom-scrollbar'
                 )}
-                placeholder="Enter a high-level description of what this rubric evaluates..."
+                placeholder={t('analysis.editor.rubricPlaceholder')}
                 value={rubric?.rubric_text || ''}
                 onChange={handleDescriptionChange}
                 disabled={isDisabled}
@@ -482,7 +497,7 @@ export default function RubricEditor({
                       onCloseWithoutSave();
                     }}
                   >
-                    Cancel
+                    {t('common.cancel')}
                   </Button>
                 )}
                 {shouldConfirmOnSave && schemaHasChanges ? (
@@ -494,16 +509,15 @@ export default function RubricEditor({
                         onClick={handleSaveClick}
                         className="gap-1.5"
                       >
-                        Save
+                        {t('analysis.editor.save')}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-80 p-3 space-y-2" align="end">
                       <div className="text-sm font-medium">
-                        You have existing labels
+                        {t('analysis.editor.existingLabels')}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        Versioning the rubric with a new schema will clear all
-                        existing labels.
+                        {t('analysis.editor.existingLabelsDescription')}
                       </div>
                       <div className="flex justify-end gap-2 pt-1">
                         <Button
@@ -511,7 +525,7 @@ export default function RubricEditor({
                           variant="ghost"
                           onClick={() => setConfirmOpen(false)}
                         >
-                          Cancel
+                          {t('common.cancel')}
                         </Button>
                         <Button
                           size="sm"
@@ -522,7 +536,7 @@ export default function RubricEditor({
                             handleSave(true);
                           }}
                         >
-                          Save
+                          {t('analysis.editor.save')}
                         </Button>
                       </div>
                     </PopoverContent>
@@ -534,7 +548,7 @@ export default function RubricEditor({
                     onClick={handleSaveClick}
                     className="gap-1.5"
                   >
-                    Save
+                    {t('analysis.editor.save')}
                   </Button>
                 )}
               </div>
@@ -571,7 +585,7 @@ export default function RubricEditor({
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     <div className="text-xs font-medium border-r pr-2 text-muted-foreground whitespace-nowrap">
-                      Output Schema
+                      {t('analysis.editor.outputSchema')}
                     </div>
                     {preview && (
                       <span className="text-xs text-muted-foreground truncate">

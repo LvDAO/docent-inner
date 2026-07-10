@@ -15,9 +15,11 @@ import AgentRunViewer, {
 } from '../components/AgentRunViewer';
 import TranscriptChat from '@/components/TranscriptChat';
 import { useCitationNavigation } from '../../rubric/[rubric_id]/NavigateToCitationContext';
+import { useLocale } from '@/app/contexts/LocaleContext';
 
 export default function AgentRunPage() {
   const dispatch = useAppDispatch();
+  const { t } = useLocale();
 
   const collectionId = useAppSelector(
     (state) => state.collection?.collectionId
@@ -94,10 +96,10 @@ export default function AgentRunPage() {
           >
             <TabsList className="grid w-full grid-cols-2 h-8">
               <TabsTrigger value="agent" className="text-xs">
-                Summary
+                {t('results.agent.summary')}
               </TabsTrigger>
               <TabsTrigger value="chat" className="text-xs">
-                Chat
+                {t('results.agent.chat')}
               </TabsTrigger>
             </TabsList>
 
@@ -112,7 +114,7 @@ export default function AgentRunPage() {
                 <TranscriptChat
                   runId={curAgentRunId}
                   collectionId={collectionId}
-                  title="Transcript Chat"
+                  title={t('results.agent.transcriptChat')}
                   className="flex-1 flex flex-col min-w-0 min-h-0"
                 />
               </div>

@@ -7,6 +7,7 @@ import { ChartData, getScoreAt } from '../utils/chartDataUtils';
 import ChartContainer from './ChartContainer';
 import { useChartFilters } from '../../hooks/use-chart-filters';
 import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { useLocale } from '../contexts/LocaleContext';
 
 // Constants
 const MAX_DIMENSION_VALUES = 100;
@@ -19,6 +20,8 @@ type SortConfig = {
   columnKey: string; // Which column we're sorting by
   direction: SortDirection;
 };
+
+type Translator = ReturnType<typeof useLocale>['t'];
 
 const getScoreDisplay = (score: number | null, ci?: number | null) => {
   if (typeof score !== 'number') return '';
@@ -38,18 +41,25 @@ const getScoreClass = (score: number | null, n: number | null) => {
 };
 
 const getFilterTitle = (
+  t: Translator,
   rowName: string,
   rowValue: string,
   colName?: string,
   colValue?: string
 ) => {
   if (colName && colValue) {
-    return `Filter to ${rowName}: ${rowValue}, ${colName}: ${colValue}`;
+    return t('charts.table.filterTwo', {
+      rowName,
+      rowValue,
+      columnName: colName,
+      columnValue: colValue,
+    });
   }
-  return `Filter to ${rowName}: ${rowValue}`;
+  return t('charts.table.filterOne', { name: rowName, value: rowValue });
 };
 
 export default function TableChart({ chartData }: { chartData: ChartData }) {
+  const { t } = useLocale();
   const { collectionId } = useAppSelector((state) => state.collection);
   const { handleCellClick, handleDimensionClick } =
     useChartFilters(collectionId);
@@ -128,7 +138,7 @@ export default function TableChart({ chartData }: { chartData: ChartData }) {
       <ChartContainer xScroll className="border-t border-border">
         <div className="w-full h-16 flex items-center justify-center">
           <p className="text-xs text-muted-foreground">
-            Select an inner or outer bin key to view grouped stats
+            {t('charts.table.selectDimensions')}
           </p>
         </div>
       </ChartContainer>
@@ -155,7 +165,10 @@ export default function TableChart({ chartData }: { chartData: ChartData }) {
                       className="block truncate overflow-hidden text-ellipsis whitespace-nowrap cursor-pointer hover:bg-muted transition-colors rounded px-1 py-0.5"
                       title={
                         tableData.colDimId
-                          ? `Filter to ${tableData.colDimId}: ${colValue}`
+                          ? t('charts.table.filterOne', {
+                              name: tableData.colDimId,
+                              value: colValue,
+                            })
                           : undefined
                       }
                       onClick={() => {
@@ -177,7 +190,7 @@ export default function TableChart({ chartData }: { chartData: ChartData }) {
                         e.stopPropagation();
                         handleSort(colValue);
                       }}
-                      title="Sort rows by this column"
+                      title={t('charts.table.sortRows')}
                     >
                       {getSortIcon(colValue)}
                     </button>
@@ -191,7 +204,10 @@ export default function TableChart({ chartData }: { chartData: ChartData }) {
               <tr key={rowValue} className="hover:bg-secondary/50">
                 <td
                   className="border-r border-border px-2 py-1 text-primary sticky left-0 bg-background cursor-pointer hover:bg-muted transition-colors relative z-[9] max-w-[200px]"
-                  title={`Filter to ${tableData.rowDimId}: ${rowValue}`}
+                  title={t('charts.table.filterOne', {
+                    name: tableData.rowDimId,
+                    value: rowValue,
+                  })}
                   onClick={() => {
                     if (tableData.rowDimId) {
                       handleDimensionClick(tableData.rowDimId, rowValue);
@@ -219,6 +235,7 @@ export default function TableChart({ chartData }: { chartData: ChartData }) {
                         getScoreClass(score ?? null, n ?? null)
                       )}
                       title={getFilterTitle(
+                        t,
                         tableData.rowDimId,
                         rowValue,
                         tableData.colDimId || undefined,
@@ -265,10 +282,20 @@ export default function TableChart({ chartData }: { chartData: ChartData }) {
         <div className="px-2 py-1 bg-yellow-50 border-t border-yellow-200 text-[11px] text-yellow-700">
           {tableData.totalRows > MAX_DIMENSION_VALUES &&
           tableData.totalCols > MAX_DIMENSION_VALUES
-            ? `Showing first ${MAX_DIMENSION_VALUES} of ${tableData.totalRows} rows and first ${MAX_DIMENSION_VALUES} of ${tableData.totalCols} columns`
+            ? t('charts.table.showingRowsAndColumns', {
+                limit: MAX_DIMENSION_VALUES,
+                rows: tableData.totalRows,
+                columns: tableData.totalCols,
+              })
             : tableData.totalRows > MAX_DIMENSION_VALUES
-              ? `Showing first ${MAX_DIMENSION_VALUES} of ${tableData.totalRows} rows`
-              : `Showing first ${MAX_DIMENSION_VALUES} of ${tableData.totalCols} columns`}
+              ? t('charts.table.showingRows', {
+                  limit: MAX_DIMENSION_VALUES,
+                  rows: tableData.totalRows,
+                })
+              : t('charts.table.showingColumns', {
+                  limit: MAX_DIMENSION_VALUES,
+                  columns: tableData.totalCols,
+                })}
         </div>
       )}
     </>

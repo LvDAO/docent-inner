@@ -43,6 +43,7 @@ import SelectWithSubmenus, {
   SelectWithSubmenusSubTrigger,
 } from '@/components/ui/select-with-submenus';
 import { useHasCollectionWritePermission } from '@/lib/permissions/hooks';
+import { useLocale } from '../contexts/LocaleContext';
 
 import { exportChartToPng, exportChartToCsv } from '../utils/exportChart';
 
@@ -66,6 +67,7 @@ function DimensionSelect({
   disabled?: boolean;
   widthClass?: string;
 }) {
+  const { t } = useLocale();
   const judgeGroups: Record<
     string,
     {
@@ -76,9 +78,9 @@ function DimensionSelect({
   > = {};
   const allItems = fields.map((f) => ({ key: f.key, label: f.name }));
   const selectedLabel = useMemo(() => {
-    if (dim == null) return 'None';
+    if (dim == null) return t('charts.settings.none');
     return allItems.find((i) => i.key === dim)?.label || dim;
-  }, [dim, allItems]);
+  }, [dim, allItems, t]);
   const runMetadataFields = [] as ChartDimension[];
   const judgeFields = [] as ChartDimension[];
   const countFields = [] as ChartDimension[];
@@ -111,6 +113,7 @@ function DimensionSelect({
         onChange={onChange}
         selectedLabel={selectedLabel}
         allowNone={allowNone}
+        noneLabel={t('charts.settings.none')}
         disabled={disabled}
         className="h-6 text-xs px-2"
       >
@@ -122,7 +125,7 @@ function DimensionSelect({
         {runMetadataFields.length > 0 && (
           <SelectWithSubmenusSub>
             <SelectWithSubmenusSubTrigger className="text-xs">
-              Run Metadata
+              {t('charts.settings.runMetadata')}
             </SelectWithSubmenusSubTrigger>
             <SelectWithSubmenusSubContent>
               {runMetadataFields.map((f) => (
@@ -155,6 +158,7 @@ function DimensionSelect({
 }
 
 export default function ChartSettings({ chart, onChange }: ChartSettingsProps) {
+  const { t } = useLocale();
   const { x_key, y_key, series_key, runs_filter } = chart;
   const collectionId = useAppSelector((state) => state.collection.collectionId);
   const hasWritePermission = useHasCollectionWritePermission();
@@ -329,7 +333,7 @@ export default function ChartSettings({ chart, onChange }: ChartSettingsProps) {
       <div className="flex flex-row flex-1 flex-wrap items-center gap-x-2 gap-y-1">
         <div className="flex items-center gap-x-1">
           <span className="text-xs text-muted-foreground whitespace-nowrap">
-            Series:
+            {t('charts.settings.series')}:
           </span>
           <DimensionSelect
             dim={outerDim}
@@ -342,14 +346,14 @@ export default function ChartSettings({ chart, onChange }: ChartSettingsProps) {
             size="icon"
             className="h-6 w-6 hover:bg-accent transition-all duration-200 text-muted-foreground hover:text-primary flex-shrink-0"
             onClick={handleSwapDimensions}
-            title="Swap dimensions"
+            title={t('charts.settings.swapDimensions')}
             disabled={!showSwapButton || !hasWritePermission}
           >
             <ArrowLeftRight size={14} className="stroke-[1.5]" />
           </Button>
 
           <span className="text-xs text-muted-foreground whitespace-nowrap">
-            X:
+            {t('charts.settings.xAxis')}:
           </span>
           <DimensionSelect
             dim={innerDim}
@@ -360,7 +364,7 @@ export default function ChartSettings({ chart, onChange }: ChartSettingsProps) {
           />
 
           <span className="text-xs text-muted-foreground whitespace-nowrap">
-            Y:
+            {t('charts.settings.yAxis')}:
           </span>
           <DimensionSelect
             dim={y_key ?? null}
@@ -374,7 +378,7 @@ export default function ChartSettings({ chart, onChange }: ChartSettingsProps) {
 
         <div className="flex items-center gap-x-1">
           <span className="text-xs text-muted-foreground whitespace-nowrap">
-            Type:
+            {t('charts.settings.type')}:
           </span>
           <Select
             value={chart.chart_type}
@@ -386,13 +390,13 @@ export default function ChartSettings({ chart, onChange }: ChartSettingsProps) {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="bar" className="text-xs">
-                Bar
+                {t('charts.settings.bar')}
               </SelectItem>
               <SelectItem value="line" className="text-xs">
-                Line
+                {t('charts.settings.line')}
               </SelectItem>
               <SelectItem value="table" className="text-xs">
-                Table
+                {t('charts.settings.table')}
               </SelectItem>
             </SelectContent>
           </Select>
@@ -400,7 +404,7 @@ export default function ChartSettings({ chart, onChange }: ChartSettingsProps) {
 
         <div className="flex items-center gap-x-1">
           <span className="text-xs text-muted-foreground whitespace-nowrap">
-            Filters:
+            {t('charts.settings.filters')}:
           </span>
 
           {runs_filter && (
@@ -421,11 +425,11 @@ export default function ChartSettings({ chart, onChange }: ChartSettingsProps) {
               <Button
                 variant="outline"
                 className="h-6 px-1 hover:bg-accent transition-all duration-200 text-muted-foreground hover:text-primary flex-shrink-0"
-                title="Add filter"
+                title={t('charts.filter.add')}
                 disabled={!hasWritePermission}
               >
                 <FunnelPlus size={18} className="stroke-[1.5]" />
-                <span className="text-xs">Add Filter</span>
+                <span className="text-xs">{t('charts.filter.add')}</span>
               </Button>
             </PopoverTrigger>
             <PopoverContent
@@ -453,14 +457,14 @@ export default function ChartSettings({ chart, onChange }: ChartSettingsProps) {
             variant="ghost"
             size="icon"
             className="h-6 w-6 hover:bg-accent transition-all duration-200 text-muted-foreground hover:text-primary"
-            title="Download"
+            title={t('charts.settings.download')}
           >
             <Download size={14} />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={handleDownloadPng}>
-            Download PNG
+            {t('charts.settings.downloadPng')}
           </DropdownMenuItem>
           <DropdownMenuItem
             onClick={handleDownloadCsv}
@@ -468,7 +472,7 @@ export default function ChartSettings({ chart, onChange }: ChartSettingsProps) {
               isFetchingChartData || !chartDataResponse?.result?.binStats
             }
           >
-            Download CSV
+            {t('charts.settings.downloadCsv')}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

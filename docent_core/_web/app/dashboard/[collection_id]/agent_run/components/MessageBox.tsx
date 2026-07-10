@@ -14,6 +14,7 @@ import { SegmentedText } from '@/lib/SegmentedText';
 import { MetadataPopover } from '@/components/metadata/MetadataPopover';
 import { MetadataBlock } from '@/components/metadata/MetadataBlock';
 import { useTextSelection } from '@/providers/use-text-selection';
+import { useLocale } from '@/app/contexts/LocaleContext';
 
 function stringify(x: any): string {
   if (typeof x === 'string') return x;
@@ -215,6 +216,7 @@ export function MessageBox({
   transcriptIdx,
   metadataDialogControl,
 }: MessageBoxProps) {
+  const { t } = useLocale();
   const containerRef = useRef<HTMLSpanElement | null>(null);
   useTextSelection({
     containerRef:
@@ -228,6 +230,13 @@ export function MessageBox({
   const highlightedCitationId = useAppSelector(
     (state) => state.transcript.highlightedCitationId
   );
+  const roleLabels: Record<string, string> = {
+    user: t('results.message.role.user'),
+    assistant: t('results.message.role.assistant'),
+    system: t('results.message.role.system'),
+    tool: t('results.message.role.tool'),
+  };
+  const roleLabel = roleLabels[message.role] ?? message.role;
 
   // Helper function to detect and pretty-print JSON
   const prettyPrintJson = (text: string): string => {
@@ -306,14 +315,20 @@ export function MessageBox({
       return (
         <div className="mt-1 text-[10px] text-muted-foreground">
           {message.tool_call_id && (
-            <span>Tool Call ID: {message.tool_call_id}</span>
+            <span>
+              {t('results.message.toolCallId', { id: message.tool_call_id })}
+            </span>
           )}
           {message.function && (
-            <span className="ml-2">Function: {message.function}</span>
+            <span className="ml-2">
+              {t('results.message.function', { name: message.function })}
+            </span>
           )}
           {message.error && (
             <div className="mt-1 text-destructive">
-              Error: {message.error.message}
+              {t('results.message.error', {
+                message: message.error.message,
+              })}
             </div>
           )}
         </div>
@@ -338,7 +353,7 @@ export function MessageBox({
             className="mt-1 p-1.5 bg-secondary/85 rounded text-xs break-all whitespace-pre-wrap"
           >
             <div className="text-[10px] text-muted-foreground mb-0.5">
-              Tool Call ID: {tool.source.id}
+              {t('results.message.toolCallId', { id: tool.source.id })}
             </div>
             {tool.source.view ? (
               <span className="font-mono">
@@ -422,8 +437,10 @@ export function MessageBox({
       >
         <div className="text-[10px] text-muted-foreground flex justify-between mb-1">
           <span>
-            Block {index} |{' '}
-            {message.role.charAt(0).toUpperCase() + message.role.slice(1)}
+            {t('results.message.blockRole', {
+              index,
+              role: roleLabel,
+            })}
           </span>
           <div className="flex items-center gap-2">
             {hasJsonContent(componentRanges.main.content) && (
@@ -434,7 +451,7 @@ export function MessageBox({
                   onChange={handlePrettyPrintJsonChange}
                   className="h-3 w-3 rounded border-border"
                 />
-                <span>Pretty JSON</span>
+                <span>{t('results.message.prettyJson')}</span>
               </label>
             )}
             {message.metadata && Object.keys(message.metadata).length > 0 && (
@@ -444,7 +461,7 @@ export function MessageBox({
               >
                 <MetadataPopover.DefaultTrigger />
                 <MetadataPopover.Content
-                  title={`Message Metadata - Block ${index}`}
+                  title={t('results.message.metadataTitle', { index })}
                 >
                   <MetadataPopover.Body metadata={message.metadata}>
                     {(md) => (

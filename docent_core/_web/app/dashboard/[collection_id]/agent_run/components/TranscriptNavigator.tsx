@@ -20,6 +20,9 @@ import {
 import { MetadataPopover } from '@/components/metadata/MetadataPopover';
 import { MetadataBlock } from '@/components/metadata/MetadataBlock';
 import { Checkbox } from '@/components/ui/checkbox';
+import { useLocale } from '@/app/contexts/LocaleContext';
+
+type Translator = ReturnType<typeof useLocale>['t'];
 
 // Unified tree node type: a node can be a group or a transcript
 export interface TreeNode {
@@ -40,6 +43,7 @@ const TreeNodeView: React.FC<{
   agentRun: AgentRun;
   transcriptsById: Record<string, Transcript>;
   transcriptGroupsById: Record<string, TranscriptGroup>;
+  t: Translator;
 }> = ({
   node,
   selectedTranscriptId,
@@ -50,6 +54,7 @@ const TreeNodeView: React.FC<{
   agentRun,
   transcriptsById,
   transcriptGroupsById,
+  t,
 }) => {
   if (node.type === 'transcript') {
     return (
@@ -60,6 +65,7 @@ const TreeNodeView: React.FC<{
         transcriptsById={transcriptsById}
         onTranscriptSelect={onTranscriptSelect}
         level={node.level}
+        t={t}
       />
     );
   }
@@ -111,7 +117,9 @@ const TreeNodeView: React.FC<{
                     </button>
                   </MetadataPopover.Trigger>
                   <MetadataPopover.Content
-                    title={`Transcript Group Metadata - ${group?.name || node.id}`}
+                    title={t('analysis.navigator.transcriptGroupMetadata', {
+                      name: group?.name || node.id,
+                    })}
                   >
                     <MetadataPopover.Body metadata={group?.metadata || {}}>
                       {(md) => <MetadataBlock metadata={md} />}
@@ -121,7 +129,7 @@ const TreeNodeView: React.FC<{
               </div>
             </TooltipTrigger>
             <TooltipContent side="left" align="center">
-              <p>View transcript group metadata</p>
+              <p>{t('analysis.navigator.viewTranscriptGroupMetadata')}</p>
             </TooltipContent>
           </Tooltip>
         ) : null}
@@ -142,6 +150,7 @@ const TreeNodeView: React.FC<{
               agentRun={agentRun}
               transcriptsById={transcriptsById}
               transcriptGroupsById={transcriptGroupsById}
+              t={t}
             />
           ))}
         </div>
@@ -158,6 +167,7 @@ const TranscriptListItem: React.FC<{
   transcriptsById: Record<string, Transcript>;
   onTranscriptSelect: (key: string) => void;
   level?: number;
+  t: Translator;
 }> = ({
   transcriptId,
   selectedTranscriptId,
@@ -165,6 +175,7 @@ const TranscriptListItem: React.FC<{
   transcriptsById,
   onTranscriptSelect,
   level = 0,
+  t,
 }) => (
   <div
     className={cn(
@@ -198,7 +209,9 @@ const TranscriptListItem: React.FC<{
                 <FileText className="h-3 w-3" />
               </button>
             </MetadataPopover.Trigger>
-            <MetadataPopover.Content title={`Transcript Metadata`}>
+            <MetadataPopover.Content
+              title={t('analysis.viewer.transcriptMetadata')}
+            >
               <MetadataPopover.Body
                 metadata={transcriptsById[transcriptId]?.metadata || {}}
               >
@@ -209,7 +222,7 @@ const TranscriptListItem: React.FC<{
         </div>
       </TooltipTrigger>
       <TooltipContent side="left" align="center">
-        <p>View transcript metadata</p>
+        <p>{t('analysis.navigator.viewTranscriptMetadata')}</p>
       </TooltipContent>
     </Tooltip>
   </div>
@@ -254,6 +267,7 @@ export const TranscriptNavigator: React.FC<{
   onToggleAllGroups,
   allGroupsExpanded,
 }) => {
+  const { t } = useLocale();
   const hasGroups = (agentRun?.transcript_groups || []).length > 0;
 
   return (
@@ -267,7 +281,9 @@ export const TranscriptNavigator: React.FC<{
         >
           <div className="flex items-center space-x-1">
             {headerLeft}
-            <div className="text-xs font-medium text-primary">Transcripts</div>
+            <div className="text-xs font-medium text-primary">
+              {t('analysis.navigator.transcripts')}
+            </div>
           </div>
           <div className="flex items-center gap-2">
             {typeof fullTree !== 'undefined' && onFullTreeChange && (
@@ -277,7 +293,7 @@ export const TranscriptNavigator: React.FC<{
                   onCheckedChange={(v) => onFullTreeChange(!!v)}
                   className="h-3.5 w-3.5"
                 />
-                <span>Full tree</span>
+                <span>{t('analysis.navigator.fullTree')}</span>
               </label>
             )}
             {hasGroups && onToggleAllGroups && (
@@ -288,8 +304,8 @@ export const TranscriptNavigator: React.FC<{
                     className="p-0.5 rounded text-muted-foreground hover:text-primary hover:bg-muted transition-colors"
                     aria-label={
                       allGroupsExpanded
-                        ? 'Collapse all groups'
-                        : 'Expand all groups'
+                        ? t('analysis.navigator.collapseAllGroups')
+                        : t('analysis.navigator.expandAllGroups')
                     }
                   >
                     {allGroupsExpanded ? (
@@ -302,8 +318,8 @@ export const TranscriptNavigator: React.FC<{
                 <TooltipContent side="bottom" align="end">
                   <p>
                     {allGroupsExpanded
-                      ? 'Collapse all groups'
-                      : 'Expand all groups'}
+                      ? t('analysis.navigator.collapseAllGroups')
+                      : t('analysis.navigator.expandAllGroups')}
                   </p>
                 </TooltipContent>
               </Tooltip>
@@ -324,6 +340,7 @@ export const TranscriptNavigator: React.FC<{
             agentRun={agentRun}
             transcriptsById={transcriptsById}
             transcriptGroupsById={transcriptGroupsById}
+            t={t}
           />
         ))}
       </div>
