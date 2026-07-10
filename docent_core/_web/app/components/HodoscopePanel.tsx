@@ -42,6 +42,7 @@ const DEFAULT_LIMIT = 500;
 const DEFAULT_MAX_ACTIONS = 5000;
 const DEFAULT_SEED = 42;
 const AUTO_GROUP = '__auto__';
+const NO_TAG_BY = '__none__';
 
 const statusLabel: Record<string, string> = {
   pending: 'Pending',
@@ -60,6 +61,7 @@ export function HodoscopePanel({
   const router = useRouter();
 
   const [groupBy, setGroupBy] = useState(AUTO_GROUP);
+  const [tagBy, setTagBy] = useState(NO_TAG_BY);
   const [limit, setLimit] = useState(DEFAULT_LIMIT);
   const [maxActions, setMaxActions] = useState(DEFAULT_MAX_ACTIONS);
   const [projectionMethod, setProjectionMethod] =
@@ -102,7 +104,12 @@ export function HodoscopePanel({
   const { data: projection, isFetching: isFetchingProjection } =
     useGetHodoscopeProjectionQuery(
       canLoadProjection && collectionId && currentAnalysis
-        ? { collectionId, analysisId: currentAnalysis.id }
+        ? {
+            collectionId,
+            analysisId: currentAnalysis.id,
+            tagBy: tagBy === NO_TAG_BY ? null : tagBy,
+            includeRubricTags: true,
+          }
         : skipToken
     );
 
@@ -230,7 +237,7 @@ export function HodoscopePanel({
                 </div>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   {projection
-                    ? `${projection.projection_method.toUpperCase()} · ${projection.points.length} actions · ${projection.groups.length} groups`
+                    ? `${projection.projection_method.toUpperCase()} · ${projection.points.length} actions · ${projection.groups.length} groups · ${projection.tag_catalog?.length ?? 0} tags`
                     : currentAnalysis?.stage
                       ? `${currentAnalysis.stage} · ${currentAnalysis.point_count} actions`
                       : 'Explore behavioral neighborhoods across agent trajectories'}
@@ -253,6 +260,29 @@ export function HodoscopePanel({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={AUTO_GROUP}>Auto detect model</SelectItem>
+                  {fieldOptions.map((field) => (
+                    <SelectItem key={field} value={field}>
+                      {field}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="w-48">
+              <Label className="text-[11px] text-muted-foreground">
+                Tag by
+              </Label>
+              <Select value={tagBy} onValueChange={setTagBy}>
+                <SelectTrigger
+                  aria-label="Add a metadata field as Hodoscope tags"
+                  className="mt-1 h-8 border-border/70 bg-background text-xs"
+                  title="Adds view-time metadata tags without rerunning the analysis"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_TAG_BY}>None</SelectItem>
                   {fieldOptions.map((field) => (
                     <SelectItem key={field} value={field}>
                       {field}

@@ -434,7 +434,131 @@
 - All five application/dependency containers are running with restart count 0. `docker top docent_worker` shows the worker parent plus two worker child processes.
 - Preserved database state: 1 collection, 89 AgentRuns, 5 Hodoscope analyses; Alembic `a2e2b7c9142a` head. Redis returns `PONG`.
 - Container-internal embedding smoke: BGE endpoint returned 200 with 512 dimensions; Qwen Hodoscope endpoint returned 200 with 1024 dimensions.
+
+---
+
+# Notes: Hodoscope Point Tags And Trajectory Paths
+
+## User Goal
+- Let Hodoscope points carry semantic tags beyond `group` and `outcome`.
+- Include tags derived from Docent rubric clustering while respecting that current rubric judgments belong to a whole trajectory/run.
+- Show how one trajectory moves through embedding space as an ordered path.
+
+## Initial Confirmed State
+- Branch: `codex/HodoscopeIntergration` at `e68b92c`.
+- Worktree was clean before this task.
+- Current Hodoscope analysis already stores action-level points and exposes a compact projection view.
+- Current frontend supports Group/Outcome coloring, category filters, point selection, representative points, and source-run navigation.
+- Prior live artifact contains 242 points from 89 imported AgentRuns.
+
+## Semantic Boundary
+- A Docent run-level rubric match can be inherited by all Hodoscope points belonging to that run, but it must not be presented as an action-level judgment.
+- A future action-level rubric should judge the action/context window directly and use a distinct provenance/type marker.
+- Trajectory paths must use source sequence indices; projected proximity does not encode time.
+
+## Investigation Pending
+- Focused verification of the chosen contract and rendered interaction.
+
+## Live Runtime Check
+- Current source deployment is healthy at backend `http://localhost:8888` and frontend `http://localhost:3000`; backend, frontend, worker, Postgres, Redis, and both embedding containers are running.
+- Current database has 5 Hodoscope analyses but 0 rubrics, 0 judge results, 0 rubric centroids, and 0 positive centroid assignments.
+- Rubric-cluster tag behavior therefore needs focused database/unit tests; the current live collection can verify metadata tags and path rendering but cannot demonstrate inherited cluster tags until a rubric is evaluated and clustered.
 - Frontend/backend/docs/openapi endpoints all returned 200; root frontend redirected to `/signup` and completed with 200.
 - Recent frontend/backend logs had no matched errors. Worker had one benign LiteLLM remote cost-map timeout warning and explicitly fell back to its local backup; worker processes remained running.
 - Old rootless formal containers are absent; former ports 3021 and 8901 return no connection.
 - Verification: `tests/unit/test_env.py` has 2 passing tests; `git diff --check` passed; `uv.lock` and `docent_core/_web/bun.lock` are unchanged.
+
+## Confirmed Backend Semantics
+- Hodoscope point identity is stable at `agent_run_id:transcript_id:transcript_idx:action_unit_idx`.
+- `trajectory_id` currently equals `agent_run_id`; `turn_id` resets per transcript and must not be used alone for path order.
+- The correct path order is `(transcript_idx, action_unit_idx)`, or the explicit ordered point IDs returned by the backend.
+- Max-action sampling can omit intermediate steps. Paths therefore describe projected points; they are not automatically complete raw trajectories.
+- Docent rubric evaluation sends the whole `AgentRun` to the judge and stores results by `agent_run_id` only.
+- Rubric centroid membership is `decision=true` on a judge-result/centroid assignment. It is not equivalent to a positive rubric match because clustering currently includes all judge outputs.
+- Read-time joins can map current latest-version direct-result centroid memberships to Hodoscope points with no new LLM calls.
+
+## Chosen Projection View V2 Contract
+- Top level `tag_catalog`: bounded tag definitions with `id`, `label`, `facet`, `source`, `scope`, `inherited`, `count`, and optional rubric/centroid provenance.
+- Per point `tag_ids`: compact references into the catalog; future true point-rubric tags can use the same field with `scope=point` and `inherited=false`.
+- Top level `trajectory_paths`: `trajectory_id`, ordered `point_ids`, projected count, optional total action count, and completeness.
+- Metadata custom tags are selected at view time through one `tag_by` field and inherited from the AgentRun.
+- Rubric-cluster tags are current read-time overlays, limited to latest rubric versions and direct results. A simple result `label` is retained as provenance, not interpreted as a universal positive predicate.
+- Existing stored analysis JSON and downloadable artifact remain unchanged; legacy analyses are enriched in the response only.
+
+## Chosen Frontend Behavior
+- Keep Outcome/Group as color modes; use tags as searchable, composable filters rather than assigning unstable colors to high-cardinality multi-label data.
+- Tag filters are OR within one facet and AND across facets.
+- Inspector separates tag provenance and labels trajectory-scope tags as inherited.
+- Selecting a point reveals its run path beneath the points; path direction is visible and sampled gaps/unknown coverage are disclosed.
+- SVG remains appropriate at the current 5,000-point cap; the path layer adds a small number of elements relative to the existing point layer.
+
+## Implementation Result
+- Compact projection responses now use `hodoscope_projection_view.v2` and include `tag_catalog`, per-point `tag_ids`, and `trajectory_paths`.
+- `GET .../projection` accepts `tag_by` and `include_rubric_tags`; frontend requests current rubric tags by default and can select one AgentRun metadata field without rerunning Hodoscope.
+- Metadata tag extraction is deterministic and bounded for scalar, list, and object values.
+- Rubric-cluster overlay reads current collection, latest rubric version, `decision=true`, and `direct_result` rows only. It keeps rubric/version/centroid/result-label provenance and never starts evaluation or clustering jobs.
+- New Hodoscope analyses count actions before `max_actions` sampling, so path coverage can be marked complete/incomplete. Legacy analyses return ordered projected paths with unknown total coverage.
+- Frontend provides searchable tag facets, OR-within/AND-across filtering, active chips, tag-aware text search, and separate Point versus Run inherited inspector sections.
+- Selecting a point shows one ordered run path with halo, S/E endpoints, direction arrows, and dashed unknown/incomplete coverage. Inspector navigation follows path order.
+- If a filter hides the selected point, selection moves to a visible representative so map, inspector, tag, and path state remain consistent.
+
+## Final Verification
+- Hodoscope focused unit tests: `24 passed`.
+- Full unit marker run with importlib mode: `58 passed, 7 deselected`; one existing Pydantic deprecation warning.
+- Production Hodoscope Pyright: `0 errors, 0 warnings`.
+- Focused ESLint: `0 errors, 0 warnings`.
+- Focused pre-commit suite: all hooks passed on the final rerun.
+- Next.js 16.2.6 production build: passed TypeScript and generated all 13 static pages; only the existing middleware deprecation warning remained.
+- `git diff --check`: passed.
+- Live read-only QA against the existing 2,763-point analysis returned projection view v2 with 89 trajectory paths, of which 88 contain multiple points.
+- `metadata.terminal_outcome` produced 3 inherited run tags covering all 2,763 points: `reward` 1,701, timeout 993, exception 69.
+- Filtering exception produced exactly `69 / 2763 visible`; inspector showed the same exception tag, and path Step 3/8, S/E, arrows, dashed coverage, hide/show, and next-step all passed.
+- Browser QA recorded 0 console errors, 0 page errors, and 0 request failures.
+- Temporary QA backend/frontend on 8889/3001 were stopped; no QA files were written to the repository.
+
+## Remaining Limits
+- The live database currently has 0 rubrics/results/centroids, so live UI could not display a rubric-cluster tag. The direct-result centroid mapping is covered by focused backend tests.
+- Existing Docent rubric results remain whole-AgentRun judgments. Their Hodoscope tags are explicitly run/trajectory inherited and are not point-level evidence.
+- True point-level rubric judging still requires an analysis/point-targeted result model and worker input based on one action/context window; the v2 `scope=point` contract is ready for that future job but does not run it yet.
+- Existing/legacy analyses cannot know original action coverage and therefore show `total_action_count=null`, `complete=null`, and dashed paths.
+- The active Docker deployment on frontend 3000/backend 8888 was left running unchanged; this source change was verified through an isolated runtime and has not been redeployed.
+
+## Changed And Untouched Files
+- Backend changed: `docent_core/docent/services/hodoscope.py`, `hodoscope_pipeline.py`, `workers/hodoscope_worker.py`, and `server/rest/hodoscope.py`.
+- Frontend changed: `hodoscopeApi.ts`, `HodoscopePanel.tsx`, and `HodoscopeEmbeddingMap.tsx`.
+- Frontend added: `HodoscopeTrajectoryLayer.tsx` and `hodoscopeViewModel.ts`.
+- Tests changed: `tests/unit/test_hodoscope_analysis.py`.
+- Planning records changed: `task_plan.md` and `notes.md`.
+- Untouched: database schema/Alembic migrations, `uv.lock`, `docent_core/_web/bun.lock`, current stored Hodoscope rows/artifacts, and active Docker containers/volumes.
+
+---
+
+# Notes: Hodoscope V2 Redeployment
+
+## Pre-deploy State
+- Current branch: `codex/HodoscopeIntergration`, HEAD `e68b92c`, with the verified Hodoscope v2 source and planning/test changes uncommitted.
+- Active services are healthy on frontend `3000` and backend `8888`; Postgres publishes `55432`, Redis publishes `56379`.
+- Current container backend still reports `hodoscope_projection_view.v1`, proving the v2 source is not yet deployed.
+- Existing application images are `docent-inner-app:current` and `docent-inner-frontend:current`.
+- Durable runtime spec is `/home/lyuwt/.config/docent-inner/docker-compose.online.yml`, mode `600`.
+- Database/Redis volumes and the current 1 collection, 89 AgentRuns, and 5 Hodoscope analyses must be preserved.
+
+## Build Attempts
+- The backend candidate reused local base/dependency layers, successfully fetched the locked Hodoscope commit, built Annoy, and continued installing dependencies.
+- The first frontend candidate reached successful compilation and TypeScript, then failed page-data collection because `NEXT_PUBLIC_API_HOST` was empty. The deployed local browser surface needs `http://localhost:8888` baked into the production bundle; rebuild with that exact value.
+- The frontend rebuild with `NEXT_PUBLIC_API_HOST=http://localhost:8888` stopped on transient Google Fonts connection failures during Next compilation; no source files or lockfiles changed.
+- The backend build later stopped on a transient GitHub TLS termination while `uv` refetched the locked Hodoscope commit; no source files or lockfiles changed.
+- A second backend dependency retry again failed only while fetching the unchanged locked GitHub dependency. Reused `docent-inner-app:current` as the dependency base and overlaid the current `docent_core`, `alembic`, and `alembic.ini`; candidate image `sha256:80a19f00e2c0...` returned `hodoscope_projection_view.v2` before promotion.
+- The host Next build reused the verified local font cache, passed all 13 routes with `NEXT_PUBLIC_API_HOST=http://localhost:8888`, and its standalone output contained `8888` but no production `8889` reference. Packaged it in the existing Node 22/non-root runner shape as candidate image `sha256:d95bba861dbc...`; isolated port `3301` smoke test returned `/health` 200.
+
+## Deployment Result
+- Alembic upgrade check completed transactionally with no pending migration output.
+- Recreated only `docent_backend`, `docent_worker`, and `docent_frontend`. Postgres, Redis, and both vLLM embedding containers were not restarted.
+- Current backend/worker image: `sha256:80a19f00e2c0...`; current frontend image: `sha256:d95bba861dbc...`.
+- Rollback tags preserve the former images: `docent-inner-app:pre-hodoscope-v2-20260710-1218` (`sha256:2cfc8b8bc69e...`) and `docent-inner-frontend:pre-hodoscope-v2-20260710-1218` (`sha256:44a09e673265...`).
+- Backend `/rest/ping` returned `{"status":"ok","message":"pong"}`; frontend `/health` returned healthy; Redis returned `PONG`; embedding ports `8000` and `8001` returned 200.
+- Backend, worker, and frontend are running with restart count 0. Worker has one parent plus two child processes, matching `--workers 2`.
+- Database contents are preserved at 1 collection, 89 AgentRuns, and 5 Hodoscope analyses.
+- Authenticated live projection returned `hodoscope_projection_view.v2` with 2,763 points, 3 metadata tags, 89 trajectory paths, and tags on all 2,763 points.
+- New-container logs contained no backend or frontend errors. Worker logged only the known LiteLLM remote cost-map timeout and explicitly fell back to its local backup; both worker children remained alive.
+- `git diff --check` passed; `uv.lock` and `docent_core/_web/bun.lock` remain unchanged. No source changes were committed or discarded during deployment.

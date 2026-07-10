@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 from datetime import UTC, datetime
 from typing import Any
 
@@ -121,6 +122,7 @@ async def hodoscope_analysis_job(ctx: ViewContext, job: SQLAJob) -> None:
             progress=15,
         )
         actions, group_by = extract_hodoscope_actions(agent_runs, config.group_by)
+        total_action_counts = dict(Counter(action.agent_run_id for action in actions))
         actions = sample_hodoscope_actions(
             actions, max_actions=config.max_actions, seed=config.seed
         )
@@ -174,6 +176,7 @@ async def hodoscope_analysis_job(ctx: ViewContext, job: SQLAJob) -> None:
             config,
             group_by=group_by,
             source=f"docent:{ctx.collection_id}",
+            total_action_counts=total_action_counts,
         )
 
         await _set_analysis_state(

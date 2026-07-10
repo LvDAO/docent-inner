@@ -8,7 +8,10 @@ import {
   Minus,
   Move,
   Plus,
+  Route,
   Search,
+  Tag,
+  X,
 } from 'lucide-react';
 import React, {
   useCallback,
@@ -22,7 +25,13 @@ import React, {
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import {
   ResizableHandle,
   ResizablePanel,
@@ -33,13 +42,26 @@ import { cn } from '@/lib/utils';
 import {
   HodoscopeProjection,
   HodoscopeProjectionPoint,
+  HodoscopeTagCatalogEntry,
 } from '../api/hodoscopeApi';
+import { HodoscopeTrajectoryLayer } from './HodoscopeTrajectoryLayer';
+import {
+  buildTagLookup,
+  getPointTags,
+  getTagDisplayLabel,
+  getTagScopeLabel,
+  getTagSourceLabel,
+  groupTagCatalog,
+  matchesHodoscopeSearch,
+  matchesPointTagFilters,
+} from './hodoscopeViewModel';
 
 const VIEW_WIDTH = 1000;
 const VIEW_PADDING = 56;
 const DEFAULT_VIEW_HEIGHT = 620;
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 8;
+const MAX_TAG_POPOVER_RESULTS = 250;
 
 type ColorMode = 'outcome' | 'group';
 type Outcome = 'passed' | 'failed' | 'timeout' | 'exception' | 'unknown';
@@ -204,21 +226,6 @@ function pointColor(
     : getGroupColor(point.group, groupNames);
 }
 
-function matchesSearch(point: HodoscopeProjectionPoint, query: string) {
-  if (!query) return true;
-  return [
-    point.summary,
-    point.context_excerpt,
-    point.group,
-    point.task_id,
-    point.exception_type,
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase()
-    .includes(query);
-}
-
 function clientToSvgPoint(
   svg: SVGSVGElement,
   clientX: number,
@@ -370,7 +377,12 @@ export function HodoscopeEmbeddingMap({
   const [hiddenCategories, setHiddenCategories] = useState<Set<string>>(
     () => new Set()
   );
+  const [selectedTagIds, setSelectedTagIds] = useState<Set<string>>(
+    () => new Set()
+  );
   const [query, setQuery] = useState('');
+  const [tagQuery, setTagQuery] = useState('');
+  const [showSelectedPath, setShowSelectedPath] = useState(true);
   const [hoveredPointId, setHoveredPointId] = useState<string | null>(null);
   const [tooltipPosition, setTooltipPosition] =
     useState<TooltipPosition | null>(null);
@@ -392,6 +404,45 @@ export function HodoscopeEmbeddingMap({
   const pointById = useMemo(
     () => new Map(projection.points.map((point) => [point.id, point])),
     [projection.points]
+  );
+
+  const tagCatalog = useMemo(
+    () => projection.tag_catalog ?? [],
+    [projection.tag_catalog]
+  );
+  const tagById = useMemo(() => buildTagLookup(tagCatalog), [tagCatalog]);
+  const normalizedTagQuery = tagQuery.trim().toLowerCase();
+  const tagFacetGroups = useMemo(
+    () => groupTagCatalog(tagCatalog, normalizedTagQuery),
+    [normalizedTagQuery, tagCatalog]
+  );
+  const matchingTagCount = useMemo(
+    () => tagFacetGroups.reduce((count, group) => count + group.tags.length, 0),
+    [tagFacetGroups]
+  );
+  const visibleTagFacetGroups = useMemo(() => {
+    let remaining = MAX_TAG_POPOVER_RESULTS;
+    return tagFacetGroups
+      .map((group) => {
+        const visibleTags = group.tags.slice(0, remaining);
+        remaining -= visibleTags.length;
+        return { ...group, tags: visibleTags };
+      })
+      .filter((group) => group.tags.length > 0);
+  }, [tagFacetGroups]);
+  const selectedTags = useMemo(
+    () =>
+      Array.from(selectedTagIds)
+        .map((tagId) => tagById.get(tagId))
+        .filter((tag): tag is HodoscopeTagCatalogEntry => Boolean(tag))
+        .sort((a, b) => {
+          const facetOrder = a.facet.localeCompare(b.facet);
+          return (
+            facetOrder ||
+            getTagDisplayLabel(a).localeCompare(getTagDisplayLabel(b))
+          );
+        }),
+    [selectedTagIds, tagById]
   );
 
   const categoryEntries = useMemo(() => {
@@ -429,9 +480,17 @@ export function HodoscopeEmbeddingMap({
       projection.points.filter(
         (point) =>
           !hiddenCategories.has(pointCategory(point, colorMode)) &&
-          matchesSearch(point, normalizedQuery)
+          matchesPointTagFilters(point, selectedTagIds, tagById) &&
+          matchesHodoscopeSearch(point, normalizedQuery, tagById)
       ),
-    [colorMode, hiddenCategories, normalizedQuery, projection.points]
+    [
+      colorMode,
+      hiddenCategories,
+      normalizedQuery,
+      projection.points,
+      selectedTagIds,
+      tagById,
+    ]
   );
 
   const selectedPoint = selectedPointId
@@ -444,6 +503,42 @@ export function HodoscopeEmbeddingMap({
   const hoveredPoint = hoveredPointId
     ? (pointById.get(hoveredPointId) ?? null)
     : null;
+  const hoveredPointTags = hoveredPoint
+    ? getPointTags(hoveredPoint, tagById)
+    : [];
+
+  const trajectoryPathById = useMemo(
+    () =>
+      new Map(
+        (projection.trajectory_paths ?? []).map((path) => [
+          path.trajectory_id,
+          path,
+        ])
+      ),
+    [projection.trajectory_paths]
+  );
+  const selectedTrajectoryPath = selectedPoint
+    ? (trajectoryPathById.get(selectedPoint.trajectory_id) ?? null)
+    : null;
+  const selectedPathPointIds = useMemo(
+    () =>
+      selectedTrajectoryPath?.point_ids.filter((pointId) =>
+        pointById.has(pointId)
+      ) ?? [],
+    [pointById, selectedTrajectoryPath]
+  );
+  const selectedPathStepIndex = selectedPointId
+    ? selectedPathPointIds.indexOf(selectedPointId)
+    : -1;
+  const selectedPointTags = selectedPoint
+    ? getPointTags(selectedPoint, tagById)
+    : [];
+  const selectedPointScopedTags = selectedPointTags.filter(
+    (tag) => tag.scope === 'point' && !tag.inherited
+  );
+  const selectedRunTags = selectedPointTags.filter(
+    (tag) => tag.scope === 'trajectory' || tag.inherited
+  );
 
   const representatives = useMemo(
     () =>
@@ -515,20 +610,31 @@ export function HodoscopeEmbeddingMap({
     setHoveredPointId(null);
     setTooltipPosition(null);
     setHiddenCategories(new Set());
+    setSelectedTagIds(new Set());
     setQuery('');
+    setTagQuery('');
+    setShowSelectedPath(true);
     selectionClearedRef.current = false;
   }, [projection.created_at]);
 
   useEffect(() => {
+    setSelectedTagIds((current) => {
+      const next = new Set(
+        Array.from(current).filter((tagId) => tagById.has(tagId))
+      );
+      return next.size === current.size ? current : next;
+    });
+  }, [tagById]);
+
+  useEffect(() => {
+    if (visiblePoints.some((point) => point.id === selectedPointId)) return;
+
     if (visiblePoints.length === 0) {
       if (selectedPointId !== null) onSelectedPointChange(null);
       return;
     }
 
-    if (
-      !visiblePoints.some((point) => point.id === selectedPointId) &&
-      !selectionClearedRef.current
-    ) {
+    if (!selectionClearedRef.current) {
       const representative = [...visiblePoints].sort(
         (a, b) => a.fps_rank - b.fps_rank
       )[0];
@@ -683,6 +789,24 @@ export function HodoscopeEmbeddingMap({
     onSelectedPointChange(visiblePoints[nextIndex].id);
   };
 
+  const moveInspectorSelection = (delta: number) => {
+    if (selectedPathPointIds.length === 0) {
+      moveSelection(delta);
+      return;
+    }
+
+    const currentIndex = selectedPointId
+      ? selectedPathPointIds.indexOf(selectedPointId)
+      : -1;
+    const nextIndex =
+      currentIndex === -1
+        ? 0
+        : (currentIndex + delta + selectedPathPointIds.length) %
+          selectedPathPointIds.length;
+    selectionClearedRef.current = false;
+    onSelectedPointChange(selectedPathPointIds[nextIndex]);
+  };
+
   const handleMapKeyDown = (event: React.KeyboardEvent<SVGSVGElement>) => {
     if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
       event.preventDefault();
@@ -717,6 +841,17 @@ export function HodoscopeEmbeddingMap({
     setHiddenCategories(new Set());
   };
 
+  const toggleTagFilter = (tagId: string) => {
+    setSelectedTagIds((current) => {
+      const next = new Set(current);
+      if (next.has(tagId)) next.delete(tagId);
+      else next.add(tagId);
+      return next;
+    });
+  };
+
+  const clearTagFilters = () => setSelectedTagIds(new Set());
+
   const previewPoint = useCallback(
     (
       point: HodoscopeProjectionPoint,
@@ -746,12 +881,31 @@ export function HodoscopeEmbeddingMap({
     [onOpenPoint]
   );
 
+  const selectedPathCoverage = selectedTrajectoryPath
+    ? `${selectedTrajectoryPath.projected_point_count} projected${
+        selectedTrajectoryPath.total_action_count === null
+          ? ' · total unknown'
+          : ` / ${selectedTrajectoryPath.total_action_count} total`
+      }`
+    : null;
+  const selectedPathNotice = selectedTrajectoryPath
+    ? selectedTrajectoryPath.complete === true
+      ? 'Complete action coverage for this projected run.'
+      : selectedTrajectoryPath.complete === false
+        ? 'Sampled path. Dashed links can skip actions not in this projection.'
+        : 'Coverage is unknown. Dashed links may skip unprojected actions.'
+    : null;
+  const selectedPathA11yDescription =
+    showSelectedPath && selectedTrajectoryPath
+      ? ` Selected run path shown with ${selectedPathCoverage}.`
+      : '';
+
   const mapPanel = (
     <div className="flex h-full min-h-0 flex-col bg-background">
       <div
         className={cn(
           'flex items-center gap-2 border-b border-border/70 px-3 py-2',
-          isWide ? 'flex-wrap' : 'flex-nowrap'
+          isWide ? 'flex-wrap' : 'flex-nowrap overflow-x-auto'
         )}
       >
         <div
@@ -765,7 +919,7 @@ export function HodoscopeEmbeddingMap({
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search actions, tasks, or errors"
+            placeholder="Search actions, tags, tasks, or errors"
             aria-label="Search embedding points"
             className="h-8 border-border/70 bg-muted/30 pl-8 text-xs"
           />
@@ -773,6 +927,7 @@ export function HodoscopeEmbeddingMap({
 
         <div
           className="flex rounded-md border border-border/70 bg-muted/30 p-0.5"
+          role="group"
           aria-label="Color embedding by"
         >
           <Button
@@ -802,6 +957,134 @@ export function HodoscopeEmbeddingMap({
             Group
           </Button>
         </div>
+
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8 shrink-0 gap-1.5 px-2.5 text-xs"
+              aria-label={`Filter by tags${selectedTagIds.size ? `, ${selectedTagIds.size} active` : ''}`}
+              disabled={tagCatalog.length === 0}
+            >
+              <Tag className="h-3.5 w-3.5" />
+              <span className={cn(!isWide && 'sr-only')}>Tags</span>
+              {selectedTagIds.size > 0 ? (
+                <span className="rounded-full bg-blue-bg px-1.5 text-[10px] font-semibold text-blue-text">
+                  {selectedTagIds.size}
+                </span>
+              ) : null}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-80 p-0">
+            <div className="border-b border-border/70 p-3">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <div>
+                  <div className="text-xs font-semibold">Filter by tags</div>
+                  <div className="text-[10px] text-muted-foreground">
+                    OR within a facet · AND across facets
+                  </div>
+                </div>
+                {selectedTagIds.size > 0 ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2 text-[11px]"
+                    onClick={clearTagFilters}
+                  >
+                    Clear
+                  </Button>
+                ) : null}
+              </div>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type="search"
+                  value={tagQuery}
+                  onChange={(event) => setTagQuery(event.target.value)}
+                  placeholder="Search tag labels or sources"
+                  aria-label="Search available Hodoscope tags"
+                  className="h-8 pl-8 text-xs"
+                />
+              </div>
+            </div>
+            <div className="max-h-72 overflow-y-auto p-2 custom-scrollbar">
+              {visibleTagFacetGroups.length > 0 ? (
+                <div className="space-y-3">
+                  {visibleTagFacetGroups.map((group) => (
+                    <section
+                      key={group.facet}
+                      aria-label={getTagSourceLabel(group.tags[0])}
+                    >
+                      <div className="mb-1 px-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        {getTagSourceLabel(group.tags[0])}
+                      </div>
+                      <div className="space-y-0.5">
+                        {group.tags.map((tag) => (
+                          <label
+                            key={tag.id}
+                            className="flex cursor-pointer items-start gap-2 rounded-md px-1.5 py-1.5 hover:bg-muted/60"
+                            title={`${getTagScopeLabel(tag)} · ${getTagSourceLabel(tag)}`}
+                          >
+                            <Checkbox
+                              checked={selectedTagIds.has(tag.id)}
+                              onCheckedChange={() => toggleTagFilter(tag.id)}
+                              aria-label={`Filter by ${getTagSourceLabel(tag)}: ${getTagDisplayLabel(tag)}`}
+                              className="mt-0.5"
+                            />
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-xs font-medium">
+                                {getTagDisplayLabel(tag)}
+                              </span>
+                              <span className="block truncate text-[10px] text-muted-foreground">
+                                {getTagScopeLabel(tag)} ·{' '}
+                                {getTagSourceLabel(tag)}
+                              </span>
+                            </span>
+                            <span className="text-[10px] tabular-nums text-muted-foreground">
+                              {tag.count}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </section>
+                  ))}
+                  {matchingTagCount > MAX_TAG_POPOVER_RESULTS ? (
+                    <p className="px-1 text-[10px] leading-relaxed text-muted-foreground">
+                      Showing the first {MAX_TAG_POPOVER_RESULTS} of{' '}
+                      {matchingTagCount} tags. Search to narrow the list.
+                    </p>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="px-3 py-8 text-center text-xs text-muted-foreground">
+                  No tags match this search.
+                </div>
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
+
+        <Button
+          type="button"
+          size="sm"
+          variant={showSelectedPath ? 'secondary' : 'outline'}
+          className="h-8 shrink-0 gap-1.5 px-2.5 text-xs"
+          aria-label={`${showSelectedPath ? 'Hide' : 'Show'} selected run path`}
+          aria-pressed={showSelectedPath}
+          disabled={!selectedTrajectoryPath}
+          title={
+            selectedTrajectoryPath
+              ? `${showSelectedPath ? 'Hide' : 'Show'} selected run path`
+              : 'Select an action with path data'
+          }
+          onClick={() => setShowSelectedPath((current) => !current)}
+        >
+          <Route className="h-3.5 w-3.5" />
+          <span className={cn(!isWide && 'sr-only')}>Path</span>
+        </Button>
 
         {isWide ? (
           <>
@@ -845,6 +1128,38 @@ export function HodoscopeEmbeddingMap({
           </>
         ) : null}
       </div>
+
+      {selectedTags.length > 0 ? (
+        <div className="flex min-h-9 items-center gap-1.5 overflow-x-auto border-b border-border/60 bg-blue-bg/20 px-3 py-1.5">
+          <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Tag filters
+          </span>
+          {selectedTags.map((tag) => (
+            <button
+              key={tag.id}
+              type="button"
+              className="inline-flex h-6 max-w-56 shrink-0 items-center gap-1 rounded-full border border-blue-border bg-background px-2 text-[10px] text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label={`Remove tag filter ${getTagSourceLabel(tag)}: ${getTagDisplayLabel(tag)}`}
+              title={`${getTagScopeLabel(tag)} · ${getTagSourceLabel(tag)}`}
+              onClick={() => toggleTagFilter(tag.id)}
+            >
+              <span className="truncate">
+                {getTagSourceLabel(tag)}: {getTagDisplayLabel(tag)}
+              </span>
+              <X className="h-3 w-3 shrink-0" aria-hidden="true" />
+            </button>
+          ))}
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="h-6 shrink-0 px-2 text-[10px]"
+            onClick={clearTagFilters}
+          >
+            Clear all
+          </Button>
+        </div>
+      ) : null}
 
       <div
         className={cn(
@@ -899,7 +1214,7 @@ export function HodoscopeEmbeddingMap({
           )}
           role="img"
           tabIndex={0}
-          aria-label={`${projection.projection_method.toUpperCase()} embedding with ${visiblePoints.length} visible actions. Use arrow keys to inspect points, Enter to open a selected run, and 0 to fit the map.`}
+          aria-label={`${projection.projection_method.toUpperCase()} embedding with ${visiblePoints.length} visible actions.${selectedPathA11yDescription} Use arrow keys to inspect points, Enter to open a selected run, and 0 to fit the map.`}
           aria-describedby={`${svgId}-selection-status`}
           viewBox={`0 0 ${viewport.width} ${viewport.height}`}
           preserveAspectRatio="xMidYMid meet"
@@ -938,6 +1253,13 @@ export function HodoscopeEmbeddingMap({
             clipPath={`url(#${clipId})`}
             transform={`translate(${view.x} ${view.y}) scale(${view.scale})`}
           >
+            {showSelectedPath && selectedTrajectoryPath ? (
+              <HodoscopeTrajectoryLayer
+                path={selectedTrajectoryPath}
+                positions={normalizedPoints}
+                scale={view.scale}
+              />
+            ) : null}
             <ProjectionMarks
               points={visiblePoints}
               positions={normalizedPoints}
@@ -961,9 +1283,13 @@ export function HodoscopeEmbeddingMap({
           aria-live="polite"
           aria-atomic="true"
         >
-          {selectedPoint && selectedVisibleIndex >= 0
-            ? `Action ${selectedVisibleIndex + 1} of ${visiblePoints.length}: ${selectedPoint.summary}`
-            : `No action selected. ${visiblePoints.length} actions visible.`}
+          {`${
+            selectedPoint
+              ? selectedVisibleIndex >= 0
+                ? `Action ${selectedVisibleIndex + 1} of ${visiblePoints.length}: ${selectedPoint.summary}`
+                : `Selected action is hidden by the current filters: ${selectedPoint.summary}. ${visiblePoints.length} actions visible.`
+              : `No action selected. ${visiblePoints.length} actions visible.`
+          }${selectedPathA11yDescription}`}
         </div>
 
         {!isWide ? (
@@ -1028,6 +1354,24 @@ export function HodoscopeEmbeddingMap({
             <p className="line-clamp-3 leading-relaxed text-muted-foreground">
               {hoveredPoint.summary}
             </p>
+            {hoveredPointTags.length > 0 ? (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {hoveredPointTags.slice(0, 3).map((tag) => (
+                  <Badge
+                    key={tag.id}
+                    variant="secondary"
+                    className="max-w-48 truncate text-[9px] font-normal"
+                  >
+                    {getTagDisplayLabel(tag)}
+                  </Badge>
+                ))}
+                {hoveredPointTags.length > 3 ? (
+                  <span className="text-[9px] text-muted-foreground">
+                    +{hoveredPointTags.length - 3}
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         ) : null}
 
@@ -1059,9 +1403,17 @@ export function HodoscopeEmbeddingMap({
             variant="ghost"
             size="icon"
             className="h-7 w-7"
-            aria-label="Select previous visible action"
-            onClick={() => moveSelection(-1)}
-            disabled={visiblePoints.length === 0}
+            aria-label={
+              selectedPathPointIds.length > 0
+                ? 'Select previous action in this run path'
+                : 'Select previous visible action'
+            }
+            onClick={() => moveInspectorSelection(-1)}
+            disabled={
+              selectedPathPointIds.length > 0
+                ? selectedPathPointIds.length < 2
+                : visiblePoints.length === 0
+            }
           >
             <ChevronLeft className="h-3.5 w-3.5" />
           </Button>
@@ -1070,9 +1422,17 @@ export function HodoscopeEmbeddingMap({
             variant="ghost"
             size="icon"
             className="h-7 w-7"
-            aria-label="Select next visible action"
-            onClick={() => moveSelection(1)}
-            disabled={visiblePoints.length === 0}
+            aria-label={
+              selectedPathPointIds.length > 0
+                ? 'Select next action in this run path'
+                : 'Select next visible action'
+            }
+            onClick={() => moveInspectorSelection(1)}
+            disabled={
+              selectedPathPointIds.length > 0
+                ? selectedPathPointIds.length < 2
+                : visiblePoints.length === 0
+            }
           >
             <ChevronRight className="h-3.5 w-3.5" />
           </Button>
@@ -1110,6 +1470,81 @@ export function HodoscopeEmbeddingMap({
               ) : null}
             </div>
 
+            {tagCatalog.length > 0 ? (
+              <section className="space-y-2" aria-label="Action tags">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-semibold">Tags</div>
+                  <div className="text-[10px] tabular-nums text-muted-foreground">
+                    {selectedPointTags.length} attached
+                  </div>
+                </div>
+
+                {selectedPointScopedTags.length > 0 ? (
+                  <div className="space-y-1.5">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Point tags
+                    </div>
+                    <div className="space-y-1">
+                      {selectedPointScopedTags.map((tag) => (
+                        <div
+                          key={tag.id}
+                          className="rounded-md border border-border/70 bg-background px-2 py-1.5"
+                          title={`${getTagScopeLabel(tag)} · ${getTagSourceLabel(tag)}`}
+                        >
+                          <Badge
+                            variant="secondary"
+                            className="max-w-full font-normal"
+                          >
+                            <span className="truncate">
+                              {getTagDisplayLabel(tag)}
+                            </span>
+                          </Badge>
+                          <div className="mt-1 text-[10px] text-muted-foreground">
+                            Point · {getTagSourceLabel(tag)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                {selectedRunTags.length > 0 ? (
+                  <div className="space-y-1.5">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Run tags · inherited
+                    </div>
+                    <div className="space-y-1">
+                      {selectedRunTags.map((tag) => (
+                        <div
+                          key={tag.id}
+                          className="rounded-md border border-blue-border/70 bg-blue-bg/20 px-2 py-1.5"
+                          title={`${getTagScopeLabel(tag)} · ${getTagSourceLabel(tag)}`}
+                        >
+                          <Badge
+                            variant="outline"
+                            className="max-w-full border-blue-border font-normal text-blue-text"
+                          >
+                            <span className="truncate">
+                              {getTagDisplayLabel(tag)}
+                            </span>
+                          </Badge>
+                          <div className="mt-1 text-[10px] text-muted-foreground">
+                            Run · inherited · {getTagSourceLabel(tag)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                {selectedPointTags.length === 0 ? (
+                  <div className="rounded-md border border-dashed border-border px-2 py-3 text-center text-[11px] text-muted-foreground">
+                    No tags are attached to this action.
+                  </div>
+                ) : null}
+              </section>
+            ) : null}
+
             <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1.5 border-y border-border/60 py-3 text-[11px]">
               {selectedPoint.task_id ? (
                 <>
@@ -1136,6 +1571,58 @@ export function HodoscopeEmbeddingMap({
                 </>
               ) : null}
             </dl>
+
+            {selectedTrajectoryPath ? (
+              <section className="rounded-lg border border-blue-border/70 bg-blue-bg/20 p-2.5">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="flex items-center gap-1.5 text-xs font-semibold">
+                      <Route className="h-3.5 w-3.5 text-blue-text" />
+                      Run path
+                    </div>
+                    <div className="mt-1 text-[10px] tabular-nums text-muted-foreground">
+                      {selectedPathStepIndex >= 0
+                        ? `Step ${selectedPathStepIndex + 1} of ${selectedPathPointIds.length}`
+                        : 'Selected action is not in the ordered path'}
+                    </div>
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      'shrink-0 font-normal',
+                      selectedTrajectoryPath.complete === true
+                        ? 'border-green-border bg-green-bg text-green-text'
+                        : selectedTrajectoryPath.complete === false
+                          ? 'border-orange-border bg-orange-bg text-orange-text'
+                          : 'border-border bg-muted text-muted-foreground'
+                    )}
+                  >
+                    {selectedTrajectoryPath.complete === true
+                      ? 'Complete'
+                      : selectedTrajectoryPath.complete === false
+                        ? 'Sampled'
+                        : 'Coverage unknown'}
+                  </Badge>
+                </div>
+                <div className="mt-2 text-[11px] font-medium tabular-nums">
+                  {selectedPathCoverage}
+                </div>
+                <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">
+                  {selectedPathNotice}
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="mt-2 h-7 w-full gap-1.5 text-[11px]"
+                  aria-pressed={showSelectedPath}
+                  onClick={() => setShowSelectedPath((current) => !current)}
+                >
+                  <Route className="h-3 w-3" />
+                  {showSelectedPath ? 'Hide path' : 'Show path'}
+                </Button>
+              </section>
+            ) : null}
 
             <Button
               type="button"

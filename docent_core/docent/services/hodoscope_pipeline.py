@@ -24,6 +24,7 @@ from docent_core.docent.services.hodoscope import (
     HODOSCOPE_EMBEDDING_MODEL,
     HodoscopeAnalysisConfig,
     build_hodoscope_projection_view,
+    build_hodoscope_trajectory_paths,
     get_hodoscope_embedding_api_key,
     get_hodoscope_embedding_base_url,
 )
@@ -377,6 +378,7 @@ def build_hodoscope_outputs(
     config: HodoscopeAnalysisConfig,
     group_by: str,
     source: str,
+    total_action_counts: dict[str, int] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     created_at = datetime.now(UTC).isoformat()
     artifact_summaries: list[dict[str, Any]] = []
@@ -409,18 +411,30 @@ def build_hodoscope_outputs(
         "fields": {"group_by": group_by},
         "embedding_model": config.embedding_model,
         "embedding_dimensionality": config.embedding_dimensionality,
+        "trajectory_manifest": [
+            {
+                "trajectory_id": trajectory_id,
+                "agent_run_id": trajectory_id,
+                "total_action_count": total_action_count,
+            }
+            for trajectory_id, total_action_count in (total_action_counts or {}).items()
+        ],
         "summaries": artifact_summaries,
     }
 
     if not embedded_summaries:
-        return artifact, {
+        projection = {
             "version": HODOSCOPE_FORMAT_VERSION,
             "created_at": created_at,
             "group_by": group_by,
             "projection_method": config.projection_method,
             "groups": [],
             "points": [],
+            "trajectory_paths": build_hodoscope_trajectory_paths(
+                [], total_action_counts=total_action_counts
+            ),
         }
+        return artifact, build_hodoscope_projection_view(projection)
 
     groups = list(dict.fromkeys(str(summary["group"]) for summary in embedded_summaries))
     group_to_idx = {group: idx for idx, group in enumerate(groups)}
@@ -469,5 +483,8 @@ def build_hodoscope_outputs(
         "requested_projection_method": config.projection_method,
         "groups": [{"name": group, "count": group_counts[group]} for group in groups],
         "points": point_rows,
+        "trajectory_paths": build_hodoscope_trajectory_paths(
+            point_rows, total_action_counts=total_action_counts
+        ),
     }
     return artifact, build_hodoscope_projection_view(projection)

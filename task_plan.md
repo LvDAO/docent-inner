@@ -301,3 +301,85 @@ Stop the older Docent Docker deployments and bring the current `/data/lyuwt/doce
 
 ## Status
 **Complete** - old Docent containers are removed, current images are rebuilt and online, data/migrations/endpoints/embeddings are verified, and the durable local runtime spec is `/home/lyuwt/.config/docent-inner/docker-compose.online.yml`.
+
+---
+
+# Task Plan: Hodoscope Point Tags And Trajectory Paths
+
+## Goal
+Add point-level semantic tags to the Hodoscope projection, including tags derived from Docent run-level rubric and cluster results, and add an ordered trajectory-path overlay without changing rubric result ownership.
+
+## Scope Boundary
+- P0: Preserve the current Hodoscope analysis artifact, Group/Outcome coloring, filters, representative points, and run deep links.
+- P0: Keep Docent rubric results run-scoped; project them onto Hodoscope action points as inherited tags instead of duplicating rubric judgments per point.
+- P0: Treat a Hodoscope trajectory as one transcript/run sequence ordered by the source action index; never infer order from 2D geometry.
+- P1: Support generic point tags from source metadata and analysis-derived labels through one stable projection field.
+- P1: Keep the map payload compact and avoid embedding full rubric explanations in every point.
+- P2: Defer true action-level LLM judging to a separate, explicit point-rubric job after the inherited-tag and path UX is validated.
+
+## Phases
+- [x] Phase 1: Load repo instructions, current Hodoscope plans, and prior implementation evidence
+- [x] Phase 2: Inspect backend schemas/pipeline, rubric and cluster ownership, and frontend map behavior
+- [x] Phase 3: Specify the point-tag contract and trajectory identity/order contract
+- [x] Phase 4: Implement backend projection enrichment and frontend tag/path interaction
+- [x] Phase 5: Add focused backend/frontend tests and run verification
+- [x] Phase 6: Record exact limitations, changed files, and runtime follow-up
+
+## Key Questions
+1. Which existing fields reliably identify a point's AgentRun, Transcript, and source action order?
+2. Which rubric/cluster results can be projected without triggering new LLM work or changing their semantics?
+3. How should the map distinguish point color, tag filtering, and selected-trajectory path without visual overload?
+4. Can old Hodoscope analyses be enriched at read time, or is regeneration required?
+
+## Decisions Made
+- Reuse the existing compact projection endpoint and full artifact boundary.
+- Implement inherited run-level rubric/cluster tags first; label them visibly as inherited rather than point-level judgments.
+- Preserve generic tag support so future native point-rubric outputs can use the same frontend contract.
+- Use a compact top-level `tag_catalog`; points reference definitions by `tag_ids`.
+- Read current latest-version direct-result rubric centroid memberships at projection-read time without starting evaluation or clustering jobs.
+- Include the rubric result's simple `label` value when available so a centroid membership is not mistaken for a positive rubric match.
+- Expose one view-time AgentRun metadata field as custom tags; scalar, list, and bounded object values are supported without regenerating embeddings.
+- Expose ordered `trajectory_paths` using point IDs. New analyses record projected/total action counts; legacy analyses report unknown completeness.
+- Draw only the selected run path by default. Do not render every run path simultaneously.
+
+## Errors Encountered
+- The first read-only Postgres count query lost SQL string quotes through nested shell quoting and failed before reading data; reran it with column aliases and no string literals.
+- Broad unit collection with pytest's default import mode collided because unit and integration both contain `test_hodoscope_analysis.py`; reran with `--import-mode=importlib`, yielding 58 passing unit tests.
+- Strict Pyright over the historical test module reported its pre-existing untyped mock helpers; production Hodoscope backend files were rerun separately with 0 errors.
+- The first isolated frontend lifecycle helper marked port 3001 ready before the temporary Next process remained available; switched to directly managed backend/frontend processes with retained logs.
+- Initial browser QA kept a filtered-out point selected, so the inspector/path could disagree with the visible tag subset; selection now moves to the lowest-FPS visible point and the corrected case passed live QA.
+- The first focused pre-commit pass reformatted `hodoscopeApi.ts`; the second pass completed with every hook green.
+- An initial jq summary used unsupported shorthand in this environment; reran with explicit object keys and confirmed the live v2 payload counts.
+
+## Status
+**Complete** - Hodoscope projection v2, read-time metadata/rubric-cluster tags, ordered selected-run paths, focused tests, full unit checks, production build, and live 2763-point browser QA are complete. The existing Docker deployment was not rebuilt or restarted.
+
+---
+
+# Task Plan: Redeploy Hodoscope V2
+
+## Goal
+Rebuild the current dirty worktree into the existing local Docent deployment and bring frontend 3000, backend 8888, and worker online with Hodoscope projection v2 while preserving database and Redis volumes.
+
+## Phases
+- [x] Phase 1: Confirm current containers, ports, worktree, runtime spec, and pre-deploy schema version
+- [x] Phase 2: Rebuild backend/worker and frontend images from the current source
+- [x] Phase 3: Apply existing migrations and recreate only application containers
+- [x] Phase 4: Verify health, preserved data, embeddings, worker, and Hodoscope v2 inside the deployed containers
+- [x] Phase 5: Record exact image/runtime state and remaining limits
+
+## Safety Boundary
+- Preserve `docent_inner_pgdata` and all Docker volumes; do not run `docker compose down -v`.
+- Do not modify `.env`, API keys, lockfiles, or existing Hodoscope analysis rows.
+- Reuse `/home/lyuwt/.config/docent-inner/docker-compose.online.yml` and its host-network embedding routing.
+- Build the current uncommitted Hodoscope v2 worktree exactly as verified; do not discard or commit user changes.
+
+## Errors Encountered
+- The first frontend candidate build used an empty `NEXT_PUBLIC_API_HOST`; Next page-data collection failed on `/settings` because this checkout requires the public API host at build time. Rebuilding with `http://localhost:8888`, matching the deployed backend.
+- The next frontend candidate build used the correct API host but failed while fetching Google Fonts because the TLS connection closed during the build; the source had already passed the same production build, so retry without changing source.
+- The first backend candidate build likewise reached dependency installation but failed fetching the locked Hodoscope Git commit when GitHub TLS terminated early; retry the exact build without changing source or lockfiles.
+- A second backend dependency build again failed only on GitHub connectivity. Because `uv.lock` and all dependencies were unchanged, built the candidate from the existing application dependency image and overlaid the current `docent_core` and Alembic source; the resulting candidate imported the deployed service and returned projection schema v2.
+- Docker could not reach Google Fonts on retry, while the host build reused the already verified font cache and passed with the correct API host. Packaged that exact standalone output into the same Node 22 non-root runner layout and smoke-tested `/health` before promotion.
+
+## Status
+**Complete** - Hodoscope v2 is online at frontend `3000` and backend `8888`; backend, worker, and frontend run the promoted candidate images with zero restarts, while Postgres, Redis, and both embedding containers remained running with their existing data.
