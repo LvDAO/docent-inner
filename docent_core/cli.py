@@ -98,18 +98,33 @@ def worker(
             signal_handler(signal.SIGINT, None)
 
 
+def _get_web_environment(
+    backend_url: str, internal_backend_url: str | None, same_origin: bool
+) -> dict[str, str]:
+    env = os.environ.copy()
+    env.pop("NEXT_PUBLIC_INTERNAL_API_HOST", None)
+    env["NEXT_PUBLIC_API_HOST"] = "" if same_origin else backend_url
+    env["DOCENT_INTERNAL_API_HOST"] = internal_backend_url or backend_url
+    return env
+
+
 @app.command(help="Run the website")
 def web(
     backend_url: str = typer.Option(
-        "http://localhost:8888", help="Backend URL for client-side (browser) requests"
+        "http://localhost:8888",
+        help="Backend URL used by the Next.js API proxy",
     ),
     internal_backend_url: str | None = typer.Option(
         None,
         help=(
-            "Internal backend URL for server-side requests. "
-            "Only required if the backend is inaccessible from the frontend deployment at the backend_url. "
-            "Ex: the Docker Compose setup."
+            "Optional backend URL override for Next.js server-side requests. "
+            "Defaults to backend_url."
         ),
+    ),
+    same_origin: bool = typer.Option(
+        True,
+        "--same-origin/--cross-origin",
+        help="Proxy browser API requests through the web origin",
     ),
     port: int = typer.Option(3000, help="Port to bind to"),
     build: bool = typer.Option(False, help="Build the web app"),
@@ -119,10 +134,7 @@ def web(
     file_path = Path(__file__).parent / "_web"
     os.chdir(file_path)
 
-    # Create environment with backend URL
-    env = os.environ.copy()
-    env["NEXT_PUBLIC_API_HOST"] = backend_url
-    env["NEXT_PUBLIC_INTERNAL_API_HOST"] = internal_backend_url or backend_url
+    env = _get_web_environment(backend_url, internal_backend_url, same_origin)
 
     # Install dependencies if requested
     if install:

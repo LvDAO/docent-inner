@@ -22,7 +22,7 @@
   - `uv run docent_core server --port 8889`
   - `uv run docent_core worker --workers 1`
   - `uv run docent_core web --port 3001 --backend-url http://localhost:8889`
-- For the full container stack, use `DOCENT_HOST=http://localhost DOCENT_SERVER_PORT=8889 DOCENT_WEB_PORT=3001 docker compose up --build`.
+- For the full container stack, use `DOCENT_SERVER_PORT=8889 DOCENT_WEB_PORT=3001 docker compose up --build`; only the Web port is published for application traffic.
 
 ## Validation Commands
 - Python tests: `uv run pytest tests/ -v`.

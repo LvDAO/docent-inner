@@ -102,9 +102,19 @@ We have provided reasonable defaults in `.env.template`, but you're welcome to c
 
 ## CORS
 
-* `DOCENT_CORS_ORIGINS`: CSV list of allowed frontend origins (optional)
+Docent uses same-origin Web/API routing by default, so normal self-hosted browser traffic does not require CORS configuration.
+
+* `DOCENT_CORS_ORIGINS`: CSV list of allowed frontend origins for explicit cross-origin deployments (optional)
     * Leave empty/unset for development (defaults to `localhost:*`)
     * Example for multiple domains: `DOCENT_CORS_ORIGINS=https://app.yourdomain.com,https://admin.yourdomain.com`
+
+## Web and API routing
+
+* `DOCENT_INTERNAL_API_HOST`: Backend origin used by the Next.js server and its `/rest` proxy.
+    * `docent_core web --backend-url ...` and Docker Compose set this automatically.
+    * When running Bun directly, set it to the backend address reachable from the Next.js process, without a trailing `/rest`.
+* `NEXT_PUBLIC_API_HOST`: Optional public backend origin for explicit cross-origin deployments. Leave it unset for the default same-origin mode.
+* `NEXT_PUBLIC_INTERNAL_API_HOST`: Deprecated compatibility alias for `DOCENT_INTERNAL_API_HOST`.
 
 ## Optional variables for deployed environments
 

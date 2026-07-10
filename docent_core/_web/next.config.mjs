@@ -1,5 +1,20 @@
+const internalApiHost = (
+  process.env.DOCENT_INTERNAL_API_HOST ||
+  process.env.NEXT_PUBLIC_INTERNAL_API_HOST ||
+  process.env.NEXT_PUBLIC_API_HOST ||
+  'http://localhost:8888'
+).replace(/\/+$/, '');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  async rewrites() {
+    return [
+      {
+        source: '/rest/:path*',
+        destination: `${internalApiHost}/rest/:path*`,
+      },
+    ];
+  },
   async redirects() {
     return [
       {
@@ -20,6 +35,11 @@ const nextConfig = {
         permanent: true,
       },
     ];
+  },
+  experimental: {
+    // Inspect imports can be large, and SSE jobs can remain idle while workers run.
+    proxyClientMaxBodySize: '50mb',
+    proxyTimeout: 86_400_000,
   },
   // Enable standalone output for Docker production builds
   output: 'standalone',

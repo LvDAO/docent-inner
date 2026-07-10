@@ -97,7 +97,7 @@ Language changes do not rewrite uploaded transcripts, metadata, quoted source ma
 
 This is the supported development and evaluation path in the current checkout; it is not a production deployment recipe. It runs Postgres and Redis in containers and runs the API, worker, and web application from the repository.
 
-> **Container limitation:** the full-stack Compose definition is present, but a clean frontend image build is not currently reproducible because `Dockerfile.frontend` runs `npm ci` while this repository tracks `bun.lock` rather than `package-lock.json`. Use the source-based web command below until the container build is aligned with the tracked lockfile.
+> The Web UI and `/rest` API share the Web origin. The backend remains a separate local process, but browsers and SDK clients only need the Web port.
 
 ### Prerequisites
 
@@ -141,10 +141,10 @@ uv run docent_core web --port 3001 --backend-url http://localhost:8889
 Open [http://localhost:3001](http://localhost:3001). In another terminal, verify the API with:
 
 ```bash
-curl http://localhost:8889/
+curl http://localhost:3001/rest/ping
 ```
 
-The API check should return `"clarity has been achieved"`. Stop the three foreground processes with `Ctrl+C`, then stop the data services without deleting their volume using:
+The API check should return `{"status":"ok","message":"pong"}` through the same origin. When using SSH port forwarding, forward only port `3001`. Stop the three foreground processes with `Ctrl+C`, then stop the data services without deleting their volume using:
 
 ```bash
 docker compose -f docker-compose-db.yml down

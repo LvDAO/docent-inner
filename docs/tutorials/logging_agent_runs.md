@@ -11,7 +11,7 @@ writer = docent.init(
     collection_id="optional-existing-collection-id",
     api_key=os.getenv("DOCENT_API_KEY"),  # is default and can be omitted
     # Uncomment and adjust these if you're self-hosting
-    # server_url="http://localhost:8889",
+    # server_url="http://localhost:3001",
     # web_url="http://localhost:3001",
 )
 ```

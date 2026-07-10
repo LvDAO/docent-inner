@@ -43,7 +43,7 @@ import {
   collectionApi,
 } from '../api/collectionApi';
 import { useHasCollectionWritePermission } from '@/lib/permissions/hooks';
-import { INTERNAL_BASE_URL } from '@/app/constants';
+import { BASE_URL } from '@/app/constants';
 
 import { navToAgentRun } from '@/lib/nav';
 import { useRouter } from 'next/navigation';
@@ -440,7 +440,7 @@ export default function ExperimentViewer({
 
     const ensureTelemetryProcessing = async () => {
       try {
-        const telemetryUrl = `${INTERNAL_BASE_URL}/rest/telemetry/${collectionId}/ensure-telemetry-processing`;
+        const telemetryUrl = `${BASE_URL}/rest/telemetry/${collectionId}/ensure-telemetry-processing`;
 
         fetch(telemetryUrl, {
           method: 'POST',
