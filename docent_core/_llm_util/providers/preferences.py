@@ -1,36 +1,30 @@
-"""Provides preferences of which LLM models to use for different Docent functions."""
+"""Provides configurable preferences for Docent LLM calls."""
 
 from functools import cached_property
-from typing import Literal
+from typing import Literal, cast
 
 from pydantic import BaseModel
 
 from docent._log_util import get_logger
+from docent_core._env_util import ENV
 
 logger = get_logger(__name__)
 
-# Global mapping of model names to their context window sizes (in tokens)
-# More specific names should come first, because we take the first one that matches a prefix
+DEEPSEEK_PROVIDER = "deepseek"
+CUSTOM_PROVIDER = "custom"
+DEEPSEEK_FLASH_MODEL = "deepseek-v4-flash"
+DEEPSEEK_PRO_MODEL = "deepseek-v4-pro"
+DEFAULT_CONTEXT_WINDOW = 1_000_000
+
+# Global mapping of model names to their context window sizes (in tokens).
 MODEL_CONTEXT_WINDOWS = {
-    # OpenAI
-    "gpt-5": 400_000,
-    # Anthropic
-    "claude-sonnet-4": 200_000,
-    # Google
-    "gemini-2.5-flash-lite": 1_000_000,
-    "gemini-2.5-flash": 1_000_000,
-    "gemini-2.5-pro": 1_000_000,
+    DEEPSEEK_FLASH_MODEL: 1_000_000,
+    DEEPSEEK_PRO_MODEL: 1_000_000,
 }
 
 
 class ModelOption(BaseModel):
-    """Configuration for a specific model from a provider.
-
-    Attributes:
-        provider: The name of the LLM provider (e.g., "openai", "anthropic").
-        model_name: The specific model to use from the provider.
-        reasoning_effort: Optional indication of computational effort to use.
-    """
+    """Configuration for a specific model from a provider."""
 
     provider: str
     model_name: str
@@ -38,15 +32,7 @@ class ModelOption(BaseModel):
 
 
 class ModelOptionWithContext(BaseModel):
-    """Enhanced model option that includes context window information for frontend use.
-
-    Attributes:
-        provider: The name of the LLM provider (e.g., "openai", "anthropic").
-        model_name: The specific model to use from the provider.
-        reasoning_effort: Optional indication of computational effort to use.
-        context_window: The context window size in tokens.
-        uses_byok: Whether this model would use the user's own API key.
-    """
+    """Enhanced model option that includes context window information for frontend use."""
 
     provider: str
     model_name: str
@@ -58,22 +44,7 @@ class ModelOptionWithContext(BaseModel):
     def from_model_option(
         cls, model_option: ModelOption, uses_byok: bool = False
     ) -> "ModelOptionWithContext":
-        """Create a ModelOptionWithContext from a ModelOption.
-
-        Args:
-            model_option: The base model option
-            uses_byok: Whether this model requires bring-your-own-key
-
-        Returns:
-            ModelOptionWithContext with context window looked up from global mapping
-        """
-        for k, v in MODEL_CONTEXT_WINDOWS.items():
-            if model_option.model_name.startswith(k):
-                context_window = v
-                break
-        else:
-            logger.warning(f"No context window found for model {model_option.model_name}")
-            context_window = 100_000
+        context_window = get_context_window(model_option.model_name)
 
         return cls(
             provider=model_option.provider,
@@ -84,340 +55,183 @@ class ModelOptionWithContext(BaseModel):
         )
 
 
-class ProviderPreferences(BaseModel):
-    """Manages model preferences for different docent functions.
+def _env_value(name: str, default: str | None = None) -> str | None:
+    value = ENV.get(name)
+    if value is None:
+        return default
+    value = value.strip()
+    return value or default
 
-    This class provides access to configured model options for each
-    function that requires LLM capabilities in the docent system.
-    """
+
+def _env_reasoning_effort(
+    name: str,
+    default: Literal["low", "medium", "high"] | None,
+) -> Literal["low", "medium", "high"] | None:
+    value = _env_value(name)
+    if value is None:
+        return default
+    if value not in {"low", "medium", "high"}:
+        logger.warning(
+            "Ignoring invalid %s=%s. Expected one of: low, medium, high.",
+            name,
+            value,
+        )
+        return default
+    return cast(Literal["low", "medium", "high"], value)
+
+
+def get_configured_llm_provider() -> str:
+    provider = _env_value("DOCENT_LLM_PROVIDER", DEEPSEEK_PROVIDER)
+    assert provider is not None
+    return provider
+
+
+def get_supported_model_api_key_providers() -> list[str]:
+    return sorted({DEEPSEEK_PROVIDER, CUSTOM_PROVIDER, get_configured_llm_provider()})
+
+
+def get_flash_model() -> str:
+    model = _env_value("DOCENT_LLM_FLASH_MODEL", DEEPSEEK_FLASH_MODEL)
+    assert model is not None
+    return model
+
+
+def get_pro_model() -> str:
+    model = _env_value("DOCENT_LLM_PRO_MODEL", DEEPSEEK_PRO_MODEL)
+    assert model is not None
+    return model
+
+
+def get_context_window(model_name: str) -> int:
+    for prefix, context_window in MODEL_CONTEXT_WINDOWS.items():
+        if model_name.startswith(prefix):
+            return context_window
+
+    raw_context_window = _env_value("DOCENT_LLM_CONTEXT_WINDOW", str(DEFAULT_CONTEXT_WINDOW))
+    assert raw_context_window is not None
+    try:
+        return int(raw_context_window)
+    except ValueError:
+        logger.warning(
+            "Ignoring invalid DOCENT_LLM_CONTEXT_WINDOW=%s. Using %s.",
+            raw_context_window,
+            DEFAULT_CONTEXT_WINDOW,
+        )
+        return DEFAULT_CONTEXT_WINDOW
+
+
+def _model_option(
+    model_env: str,
+    default_model: str,
+    default_reasoning_effort: Literal["low", "medium", "high"] | None,
+) -> ModelOption:
+    model_name = _env_value(model_env, default_model)
+    assert model_name is not None
+    return ModelOption(
+        provider=get_configured_llm_provider(),
+        model_name=model_name,
+        reasoning_effort=_env_reasoning_effort(
+            f"{model_env}_REASONING_EFFORT", default_reasoning_effort
+        ),
+    )
+
+
+def _flash_option(
+    model_env: str,
+    default_reasoning_effort: Literal["low", "medium", "high"] | None = "low",
+) -> ModelOption:
+    return _model_option(model_env, get_flash_model(), default_reasoning_effort)
+
+
+def _pro_option(
+    model_env: str,
+    default_reasoning_effort: Literal["low", "medium", "high"] | None = "medium",
+) -> ModelOption:
+    return _model_option(model_env, get_pro_model(), default_reasoning_effort)
+
+
+class ProviderPreferences(BaseModel):
+    """Manages provider/model preferences for Docent LLM capabilities."""
 
     @cached_property
     def default_chat_models(self) -> list[ModelOption]:
-        """Models that can be used for chat if the user does not provide their own API key."""
-        return [
-            ModelOption(
-                provider="anthropic",
-                model_name="claude-sonnet-4-20250514",
-            ),
-            ModelOption(
-                provider="openai",
-                model_name="gpt-5",
-                reasoning_effort="low",
-            ),
-        ]
+        return [_pro_option("DOCENT_LLM_CHAT_MODEL", "medium")]
 
     @cached_property
     def byok_chat_models(self) -> list[ModelOption]:
-        """Models that can be used for chat if the user provides their own API key."""
-        return [
-            ModelOption(
-                provider="google",
-                model_name="gemini-2.5-flash-lite",
-                reasoning_effort="low",
-            ),
-        ]
+        return [_pro_option("DOCENT_LLM_CHAT_MODEL", "medium")]
 
     @cached_property
     def generate_new_queries(self) -> list[ModelOption]:
-        """Get model options for the generate_new_queries function.
-
-        Returns:
-            List of configured model options for this function.
-        """
-        return [
-            ModelOption(
-                provider="anthropic",
-                model_name="claude-sonnet-4-20250514",
-                reasoning_effort="medium",
-            ),
-            ModelOption(
-                provider="google",
-                model_name="gemini-2.5-flash-preview-05-20",
-                reasoning_effort="medium",
-            ),
-            ModelOption(
-                provider="openai",
-                model_name="o1",
-                reasoning_effort="medium",
-            ),
-        ]
+        return [_pro_option("DOCENT_LLM_GENERATE_QUERIES_MODEL", "medium")]
 
     @cached_property
     def summarize_intended_solution(self) -> list[ModelOption]:
-        """Get model options for the summarize_intended_solution function.
-
-        Returns:
-            List of configured model options for this function.
-        """
-        return [
-            ModelOption(
-                provider="anthropic",
-                model_name="claude-sonnet-4-20250514",
-            ),
-            ModelOption(
-                provider="google",
-                model_name="gemini-2.5-flash-preview-05-20",
-            ),
-            ModelOption(
-                provider="openai",
-                model_name="gpt-4o-2024-08-06",
-            ),
-        ]
+        return [_pro_option("DOCENT_LLM_SUMMARIZE_INTENDED_SOLUTION_MODEL", "medium")]
 
     @cached_property
     def summarize_agent_actions(self) -> list[ModelOption]:
-        """Get model options for the summarize_agent_actions function.
+        return [_flash_option("DOCENT_LLM_SUMMARIZE_AGENT_ACTIONS_MODEL", "low")]
 
-        Returns:
-            List of configured model options for this function.
-        """
-        return [
-            ModelOption(
-                provider="anthropic",
-                model_name="claude-sonnet-4-20250514",
-                reasoning_effort="low",
-            ),
-            ModelOption(
-                provider="google",
-                model_name="gemini-2.5-flash-preview-05-20",
-                reasoning_effort="low",
-            ),
-            ModelOption(
-                provider="openai",
-                model_name="o1",
-                reasoning_effort="low",
-            ),
-        ]
+    @cached_property
+    def hodoscope_action_summaries(self) -> list[ModelOption]:
+        return [_flash_option("DOCENT_LLM_HODOSCOPE_ACTION_SUMMARY_MODEL", "low")]
 
     @cached_property
     def group_actions_into_high_level_steps(self) -> list[ModelOption]:
-        """Get model options for the group_actions_into_high_level_steps function.
-
-        Returns:
-            List of configured model options for this function.
-        """
-        return [
-            ModelOption(
-                provider="anthropic",
-                model_name="claude-sonnet-4-20250514",
-                reasoning_effort="low",
-            ),
-            ModelOption(
-                provider="google",
-                model_name="gemini-2.5-flash-preview-05-20",
-                reasoning_effort="low",
-            ),
-            ModelOption(
-                provider="openai",
-                model_name="o1",
-                reasoning_effort="low",
-            ),
-        ]
+        return [_flash_option("DOCENT_LLM_GROUP_ACTIONS_MODEL", "low")]
 
     @cached_property
     def interesting_agent_observations(self) -> list[ModelOption]:
-        """Get model options for the interesting_agent_observations function.
-
-        Returns:
-            List of configured model options for this function.
-        """
-        return [
-            ModelOption(
-                provider="anthropic",
-                model_name="claude-sonnet-4-20250514",
-                reasoning_effort="medium",
-            ),
-            ModelOption(
-                provider="google",
-                model_name="gemini-2.5-flash-preview-05-20",
-                reasoning_effort="medium",
-            ),
-            ModelOption(
-                provider="openai",
-                model_name="o1",
-                reasoning_effort="medium",
-            ),
-        ]
+        return [_pro_option("DOCENT_LLM_OBSERVATIONS_MODEL", "medium")]
 
     @cached_property
     def propose_clusters(self) -> list[ModelOption]:
-        """Get model options for the propose_clusters function.
-
-        Returns:
-            List of configured model options for this function.
-        """
-        return [
-            ModelOption(
-                provider="anthropic",
-                model_name="claude-sonnet-4-20250514",
-            ),
-            ModelOption(
-                provider="google",
-                model_name="gemini-2.5-flash-preview-05-20",
-            ),
-            ModelOption(
-                provider="openai",
-                model_name="gpt-4o-2024-08-06",
-            ),
-        ]
+        return [_pro_option("DOCENT_LLM_CLUSTER_MODEL", "medium")]
 
     @cached_property
     def refine_agent(self) -> list[ModelOption]:
-        """Get model options for the refinement agent
-
-        Returns:
-            List of configured model options for this function.
-        """
-        return [
-            ModelOption(
-                provider="openai",
-                model_name="gpt-5",
-                reasoning_effort="low",
-            ),
-            ModelOption(
-                provider="anthropic",
-                model_name="claude-sonnet-4-20250514",
-                reasoning_effort="medium",
-            ),
-        ]
+        return [_pro_option("DOCENT_LLM_REFINE_MODEL", "medium")]
 
     @cached_property
     def execute_search(self) -> list[ModelOption]:
-        """Get model options for the execute_search function.
-
-        Returns:
-            List of configured model options for this function.
-        """
-        return [
-            ModelOption(
-                provider="anthropic",
-                model_name="claude-sonnet-4-20250514",
-                reasoning_effort=None,
-            ),
-            ModelOption(
-                provider="google",
-                model_name="gemini-2.5-flash-preview-05-20",
-                reasoning_effort="medium",
-            ),
-            ModelOption(
-                provider="openai",
-                model_name="o1",
-                reasoning_effort="low",
-            ),
-        ]
+        return [_pro_option("DOCENT_LLM_SEARCH_MODEL", "medium")]
 
     @cached_property
     def cluster_assign_o3_mini(self) -> list[ModelOption]:
-        """Get model options for the cluster_assign_o3-mini function.
-
-        Returns:
-            List of configured model options for this function.
-        """
-        return [
-            ModelOption(
-                provider="openai",
-                model_name="o3-mini",
-                reasoning_effort="medium",
-            ),
-        ]
+        return [_flash_option("DOCENT_LLM_CLUSTER_ASSIGN_MODEL", "medium")]
 
     @cached_property
     def cluster_assign_o4_mini(self) -> list[ModelOption]:
-        """Get model options for the cluster_assign_o4-mini function.
-
-        Returns:
-            List of configured model options for this function.
-        """
-        return [
-            ModelOption(
-                provider="openai",
-                model_name="o4-mini",
-                reasoning_effort="medium",
-            ),
-        ]
+        return [_flash_option("DOCENT_LLM_CLUSTER_ASSIGN_MODEL", "medium")]
 
     @cached_property
     def cluster_assign_sonnet_4_thinking(self) -> list[ModelOption]:
-        """Get model options for the cluster_assign_sonnet_4_thinking function.
-
-        Returns:
-            List of configured model options for this function.
-        """
-        return [
-            ModelOption(
-                provider="anthropic",
-                model_name="claude-sonnet-4-20250514",
-                reasoning_effort="medium",
-            ),
-        ]
+        return [_pro_option("DOCENT_LLM_CLUSTER_ASSIGN_STRONG_MODEL", "medium")]
 
     @cached_property
     def cluster_assign_gemini_flash(self) -> list[ModelOption]:
-        """Get model options for the cluster_assign_gemini_flash function.
-
-        Returns:
-                List of configured model options for this function.
-        """
-        return [
-            ModelOption(
-                provider="google",
-                model_name="gemini-2.5-flash-preview-05-20",
-                reasoning_effort="medium",
-            ),
-        ]
+        return [_flash_option("DOCENT_LLM_CLUSTER_ASSIGN_MODEL", "medium")]
 
     @cached_property
     def handle_refinement_message(self) -> list[ModelOption]:
-        """Get model options for the handle_refinement_message function.
-        Returns:
-            List of configured model options for this function.
-        """
-        return [
-            ModelOption(
-                provider="openai",
-                model_name="gpt-5",
-                reasoning_effort="low",
-            ),
-            # ModelOption(
-            #     provider="openai",
-            #     model_name="gpt-4.1",
-            # ),
-            # ModelOption(
-            #     provider="anthropic",
-            #     model_name="claude-sonnet-4-20250514",
-            # ),
-        ]
+        return [_pro_option("DOCENT_LLM_REFINEMENT_MESSAGE_MODEL", "medium")]
 
     @cached_property
     def default_judge_models(self) -> list[ModelOption]:
-        """Judge models that any user can access without providing their own API key"""
-
         return [
-            ModelOption(provider="openai", model_name="gpt-5", reasoning_effort="medium"),
-            ModelOption(provider="openai", model_name="gpt-5", reasoning_effort="low"),
-            ModelOption(provider="openai", model_name="gpt-5-mini", reasoning_effort="medium"),
-            ModelOption(
-                provider="anthropic",
-                model_name="claude-sonnet-4-20250514",
-                reasoning_effort="medium",
-            ),
+            _pro_option("DOCENT_LLM_JUDGE_MODEL", "medium"),
+            _flash_option("DOCENT_LLM_JUDGE_FALLBACK_MODEL", "medium"),
         ]
 
     @cached_property
     def byok_judge_models(self) -> list[ModelOption]:
-        """Judge models that require a user to provide their own API key, e.g. because they're
-        expensive, or our rate limits are low"""
-
         return [
-            ModelOption(
-                provider="google",
-                model_name="gemini-2.5-flash",
-                reasoning_effort="medium",
-            ),
+            _pro_option("DOCENT_LLM_JUDGE_MODEL", "medium"),
+            _flash_option("DOCENT_LLM_JUDGE_FALLBACK_MODEL", "medium"),
         ]
 
 
-# Initialize the singleton preferences object
 PROVIDER_PREFERENCES = ProviderPreferences()
 
 
@@ -428,8 +242,11 @@ def merge_models_with_byok(
 ) -> list[ModelOptionWithContext]:
     user_keys = api_keys or {}
 
-    merged: list[ModelOption] = list(defaults)
-    if user_keys:
-        merged.extend([m for m in byok if m.provider in user_keys])
+    merged: dict[tuple[str, str, str | None], ModelOption] = {}
+    for model in [*defaults, *[m for m in byok if m.provider in user_keys]]:
+        merged[(model.provider, model.model_name, model.reasoning_effort)] = model
 
-    return [ModelOptionWithContext.from_model_option(m, m.provider in user_keys) for m in merged]
+    return [
+        ModelOptionWithContext.from_model_option(model, model.provider in user_keys)
+        for model in merged.values()
+    ]

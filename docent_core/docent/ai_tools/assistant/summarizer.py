@@ -42,10 +42,11 @@ async def summarize_agent_actions(
     transcript: Transcript,
     streaming_callback: SummarizeLowLevelActionsStreamingCallback | None = None,
     completion_callback: SummarizeLowLevelActionsStreamingCallback | None = None,
+    transcript_idx: int = 0,
 ) -> list[LowLevelAction]:
     prompt = f"""
 Transcript:
-{transcript.to_str(use_action_units=True)[0]}
+{transcript.to_str(use_action_units=True, transcript_idx=transcript_idx)[0]}
 
 For each action unit in the transcript, provide a title and concise but specific summary of important details. Your summary should be understandable standalone; do not drop context.
 Tailor your response to a user with: {USER_BACKGROUND}. Also assume that they aren't familiar with the task, so include specific relevant context.
@@ -144,6 +145,7 @@ async def group_actions_into_high_level_steps(
     action_summaries: list[LowLevelAction],
     transcript: Transcript,
     streaming_callback: SummarizeHighLevelActionsStreamingCallback | None = None,
+    transcript_idx: int = 0,
 ) -> list[HighLevelAction]:
     """
     Groups action unit summaries into high-level steps.
@@ -167,7 +169,7 @@ async def group_actions_into_high_level_steps(
 
     prompt = f"""
 Transcript:
-{transcript.to_str(use_action_units=True)[0]}
+{transcript.to_str(use_action_units=True, transcript_idx=transcript_idx)[0]}
 
 Action Unit Summaries:
 {action_summaries_text}
@@ -303,10 +305,11 @@ async def interesting_agent_observations(
     transcript: Transcript,
     streaming_callback: SummarizeAgentObservationsStreamingCallback | None = None,
     completion_callback: SummarizeAgentObservationsStreamingCallback | None = None,
+    transcript_idx: int = 0,
 ) -> list[ObservationType]:
     prompt = f"""
 Transcript:
-{transcript.to_str(use_action_units=True)[0]}
+{transcript.to_str(use_action_units=True, transcript_idx=transcript_idx)[0]}
 
 Analyze the transcript and make notable observations about the agent's behavior. Look specifically for:
 1. Mistakes or missteps

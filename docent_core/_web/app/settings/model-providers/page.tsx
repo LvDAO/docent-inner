@@ -32,9 +32,8 @@ interface ModelApiKey {
 }
 
 const PROVIDERS = [
-  { value: 'openai', label: 'OpenAI' },
-  { value: 'anthropic', label: 'Anthropic' },
-  { value: 'google', label: 'Google' },
+  { value: 'deepseek', label: 'DeepSeek' },
+  { value: 'custom', label: 'Custom endpoint' },
 ] as const;
 
 export default function ModelProvidersPage() {

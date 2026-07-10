@@ -12,6 +12,18 @@ cp .env.template .env
 
 You should now have a `.env` file at the project root. See [here for details on how to fill it in](./environment_variables.md).
 
+For LLM-backed analysis, set the LLM endpoint in `.env`. The default is DeepSeek:
+
+```bash
+DOCENT_LLM_PROVIDER=deepseek
+DOCENT_LLM_BASE_URL=https://api.deepseek.com
+DOCENT_LLM_API_KEY=...
+DOCENT_LLM_FLASH_MODEL=deepseek-v4-flash
+DOCENT_LLM_PRO_MODEL=deepseek-v4-pro
+```
+
+For a custom OpenAI-compatible endpoint, set `DOCENT_LLM_PROVIDER=custom`, provide your `DOCENT_LLM_BASE_URL`, and set the model variables you want each Docent feature to use. See [LLM calls](./environment_variables.md#llm-calls) for the per-feature model list.
+
 !!! note
     If you're self-hosting Docent anywhere other than `localhost`, make sure to set the frontend URL as a CORS origin; e.g., `DOCENT_CORS_ORIGINS=http://domain:3001`.
 

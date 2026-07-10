@@ -8,7 +8,7 @@ import zipfile
 from datetime import datetime
 from functools import partial
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Awaitable, Callable, Literal, NotRequired, TypedDict, cast
 
 import anyio
 from fastapi import (
@@ -28,7 +28,9 @@ from sqlalchemy.inspection import inspect as sqla_inspect
 
 from docent._log_util.logger import get_logger
 from docent.data_models.agent_run import AgentRun, FilterableField
+from docent.data_models.transcript import Transcript
 from docent.loaders import load_inspect
+from docent_core._llm_util.providers.preferences import get_supported_model_api_key_providers
 from docent_core._server._analytics.posthog import AnalyticsClient
 from docent_core._server._auth.session import (
     COOKIE_KEY,
@@ -488,9 +490,7 @@ async def import_runs_from_file(
     await mono_svc.check_space_for_runs(ctx, count_new_runs)
 
     # Create an in-memory stream for SSE
-    send_stream, recv_stream = anyio.create_memory_object_stream[dict[str, Any]](
-        max_buffer_size=100_000
-    )
+    send_stream, recv_stream = anyio.create_memory_object_stream[Any](max_buffer_size=100_000)
 
     async def _execute():
         t_start = time.perf_counter()
@@ -1222,7 +1222,7 @@ async def upsert_model_api_key(
 ):
     """Create or update a model API key for the authenticated user."""
     # Validate provider
-    valid_providers = ["openai", "anthropic", "google"]
+    valid_providers = get_supported_model_api_key_providers()
     if request.provider not in valid_providers:
         raise HTTPException(
             status_code=400,
@@ -1292,6 +1292,159 @@ async def compute_embeddings(
 #######################
 
 
+ActionSummaryStatus = Literal["pending", "running", "complete", "error"]
+
+
+class TranscriptActionsSummary(TypedDict):
+    transcript_id: str
+    transcript_idx: int
+    transcript_name: str | None
+    transcript_group_id: str | None
+    low_level: list[LowLevelAction]
+    high_level: list[HighLevelAction]
+    observations: list[ObservationType]
+    status: ActionSummaryStatus
+    error: NotRequired[str]
+
+
+class ActionsSummaryPayload(TypedDict):
+    agent_run_id: str
+    low_level: list[LowLevelAction]
+    high_level: list[HighLevelAction]
+    observations: list[ObservationType]
+    transcript_summaries: list[TranscriptActionsSummary]
+    current_transcript_idx: int | None
+    total_transcripts: int
+
+
+def _get_ordered_transcripts(agent_run: AgentRun) -> list[tuple[int, str, Transcript]]:
+    transcript_ids_ordered = agent_run.get_transcript_ids_ordered(full_tree=False)
+    if not transcript_ids_ordered:
+        return [(idx, transcript.id, transcript) for idx, transcript in enumerate(agent_run.transcripts)]
+
+    return [
+        (transcript_idx, transcript_id, agent_run.transcript_dict[transcript_id])
+        for transcript_idx, transcript_id in enumerate(transcript_ids_ordered)
+    ]
+
+
+def _new_transcript_actions_summary(
+    transcript_idx: int,
+    transcript_id: str,
+    transcript: Transcript,
+) -> TranscriptActionsSummary:
+    return {
+        "transcript_id": transcript_id,
+        "transcript_idx": transcript_idx,
+        "transcript_name": transcript.name,
+        "transcript_group_id": transcript.transcript_group_id,
+        "low_level": [],
+        "high_level": [],
+        "observations": [],
+        "status": "pending",
+    }
+
+
+def _get_actions_summary_payload(
+    agent_run_id: str,
+    transcript_summaries: list[TranscriptActionsSummary],
+    current_transcript_idx: int | None,
+) -> ActionsSummaryPayload:
+    first_summary = transcript_summaries[0] if transcript_summaries else None
+    return {
+        "agent_run_id": agent_run_id,
+        "low_level": first_summary["low_level"] if first_summary else [],
+        "high_level": first_summary["high_level"] if first_summary else [],
+        "observations": first_summary["observations"] if first_summary else [],
+        "transcript_summaries": transcript_summaries,
+        "current_transcript_idx": current_transcript_idx,
+        "total_transcripts": len(transcript_summaries),
+    }
+
+
+async def _summarize_transcript_actions(
+    transcript_summary: TranscriptActionsSummary,
+    transcript: Transcript,
+    send_update: Callable[[], Awaitable[None]],
+) -> None:
+    transcript_idx = transcript_summary["transcript_idx"]
+    transcript_summary["status"] = "running"
+    transcript_summary.pop("error", None)
+    await send_update()
+
+    async def _actions_callback(actions: list[LowLevelAction]):
+        transcript_summary["low_level"] = actions
+        await send_update()
+
+    async def _high_level_actions_callback(actions: list[HighLevelAction]):
+        transcript_summary["high_level"] = actions
+        await send_update()
+
+    async def _observations_callback(observations: list[ObservationType]):
+        transcript_summary["observations"] = observations
+        await send_update()
+
+    async with anyio.create_task_group() as tg:
+        tg.start_soon(
+            partial(
+                interesting_agent_observations,
+                transcript,
+                streaming_callback=_observations_callback,
+                transcript_idx=transcript_idx,
+            )
+        )
+
+        low_level_actions = await summarize_agent_actions(
+            transcript,
+            streaming_callback=_actions_callback,
+            transcript_idx=transcript_idx,
+        )
+        transcript_summary["low_level"] = low_level_actions
+        await send_update()
+
+        if low_level_actions:
+            high_level_actions = await group_actions_into_high_level_steps(
+                low_level_actions,
+                transcript,
+                streaming_callback=_high_level_actions_callback,
+                transcript_idx=transcript_idx,
+            )
+            transcript_summary["high_level"] = high_level_actions
+            await send_update()
+
+    transcript_summary["status"] = "complete"
+    await send_update()
+
+
+async def _summarize_ordered_transcripts_actions(
+    transcript_summaries: list[TranscriptActionsSummary],
+    ordered_transcripts: list[tuple[int, str, Transcript]],
+    set_current_transcript_idx: Callable[[int | None], None],
+    send_update: Callable[[], Awaitable[None]],
+) -> None:
+    await send_update()
+
+    for transcript_summary, (_, _, transcript) in zip(
+        transcript_summaries,
+        ordered_transcripts,
+        strict=True,
+    ):
+        set_current_transcript_idx(transcript_summary["transcript_idx"])
+        try:
+            await _summarize_transcript_actions(
+                transcript_summary,
+                transcript,
+                send_update,
+            )
+        except Exception as exc:
+            transcript_summary["status"] = "error"
+            transcript_summary["error"] = str(exc)
+            await send_update()
+
+    set_current_transcript_idx(None)
+    await send_update()
+
+
 @user_router.get("/{collection_id}/actions_summary")
 async def get_actions_summary(
     agent_run_id: str,
@@ -1302,15 +1455,16 @@ async def get_actions_summary(
     agent_run = await mono_svc.get_agent_run(ctx, agent_run_id, apply_base_where_clause=False)
     if not agent_run:
         raise HTTPException(status_code=404, detail=f"AgentRun {agent_run_id} not found")
-    # Get first transcript TODO(mengk): generalize to multi-agent setting
     if len(agent_run.transcripts) == 0:
         raise HTTPException(status_code=404, detail=f"AgentRun {agent_run_id} has no transcripts")
-    transcript = agent_run.transcripts[0]
 
     # Result variables; hashes prevent updating with identical content multiple times
-    low_level_actions: list[LowLevelAction] = []
-    high_level_actions: list[HighLevelAction] = []
-    agent_observations: list[ObservationType] = []
+    ordered_transcripts = _get_ordered_transcripts(agent_run)
+    transcript_summaries = [
+        _new_transcript_actions_summary(transcript_idx, transcript_id, transcript)
+        for transcript_idx, transcript_id, transcript in ordered_transcripts
+    ]
+    current_transcript_idx: int | None = None
     prev_hash: str | None = None
 
     # AnyIO queue that we can write intermediate results to
@@ -1320,14 +1474,16 @@ async def get_actions_summary(
     lock = anyio.Lock()  # Only one payload can be sent at a time
 
     def _get_payload():
-        nonlocal low_level_actions, high_level_actions, agent_observations, agent_run_id
+        nonlocal agent_run_id, current_transcript_idx, transcript_summaries
 
-        payload = {
-            "low_level": low_level_actions,
-            "high_level": high_level_actions,
-            "observations": agent_observations,
-            "agent_run_id": agent_run_id,
-        }
+        payload = cast(
+            dict[str, Any],
+            _get_actions_summary_payload(
+                agent_run_id,
+                transcript_summaries,
+                current_transcript_idx,
+            ),
+        )
         payload_hash = hashlib.sha256(
             json.dumps(to_jsonable_python(payload), sort_keys=True).encode()
         ).hexdigest()
@@ -1343,50 +1499,21 @@ async def get_actions_summary(
                 await send_stream.send(payload)
                 prev_hash = payload_hash
 
-    async def _actions_callback(actions: list[LowLevelAction]):
-        nonlocal low_level_actions
-        low_level_actions = actions
-        await _send_payload_if_new()  # TODO: does this slow things down? should be run in the background, i think
-
-    async def _high_level_actions_callback(actions: list[HighLevelAction]):
-        nonlocal high_level_actions
-        high_level_actions = actions
-        await _send_payload_if_new()
-
-    async def _observations_callback(observations: list[ObservationType]):
-        nonlocal agent_observations
-        agent_observations = observations
-        await _send_payload_if_new()
-
-    # Run agent observations concurrently with the other tasks
     async def _execute():
-        async with anyio.create_task_group() as tg:
-            tg.start_soon(
-                partial(
-                    interesting_agent_observations,
-                    transcript,
-                    streaming_callback=_observations_callback,
-                    # api_keys=api_keys,
-                )
-            )
+        def _set_current_transcript_idx(transcript_idx: int | None):
+            nonlocal current_transcript_idx
+            current_transcript_idx = transcript_idx
 
-            # Concurrently, get the low-level actions
-            low_level_actions = await summarize_agent_actions(
-                transcript,
-                streaming_callback=_actions_callback,
-                # api_keys=api_keys
+        try:
+            await _summarize_ordered_transcripts_actions(
+                transcript_summaries,
+                ordered_transcripts,
+                _set_current_transcript_idx,
+                _send_payload_if_new,
             )
-            # Wait for low-level actions, then group them into high-level steps
-            if low_level_actions:
-                await group_actions_into_high_level_steps(
-                    low_level_actions,
-                    transcript,
-                    streaming_callback=_high_level_actions_callback,
-                    # api_keys=api_keys,
-                )
-
-        # At the very end, close the recv_stream
-        await send_stream.aclose()
+        finally:
+            # At the very end, close the recv_stream
+            await send_stream.aclose()
 
     return StreamingResponse(
         sse_stream(_execute, send_stream, recv_stream), media_type="text/event-stream"

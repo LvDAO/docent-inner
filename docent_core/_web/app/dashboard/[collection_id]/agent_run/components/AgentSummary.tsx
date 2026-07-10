@@ -8,7 +8,7 @@ import {
   SmilePlus,
   X,
 } from 'lucide-react';
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 
 import { useAppDispatch, useAppSelector } from '@/app/store/hooks';
 import { getActionsSummary } from '@/app/store/transcriptSlice';
@@ -16,9 +16,9 @@ import { Citation } from '@/app/types/experimentViewerTypes';
 import {
   LowLevelAction,
   HighLevelAction,
-  ActionsSummary,
   ObservationCategory,
   ObservationType,
+  TranscriptActionsSummary,
 } from '@/app/types/transcriptTypes';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
@@ -74,7 +74,7 @@ const TYPE_STYLES: Record<
 // Agent Behavior Sequence Component
 const BehaviorSequence: React.FC<{
   observations?: ObservationType[];
-  actionsSummary?: ActionsSummary | null;
+  actionsSummary?: { low_level?: LowLevelAction[] } | null;
   onActionClick?: (actionIndex: number) => void;
 }> = ({ observations = [], actionsSummary, onActionClick }) => {
   // If there are no observations, don't render anything
@@ -165,6 +165,7 @@ const ActionItem = ({
   lowLevelActions = [],
   observations = [],
   agentRunId,
+  transcriptIdx,
   expandedActions,
   setExpandedActions,
   setActionRef,
@@ -174,6 +175,7 @@ const ActionItem = ({
   lowLevelActions?: LowLevelAction[];
   observations?: ObservationType[];
   agentRunId?: string;
+  transcriptIdx?: number;
   expandedActions?: Set<number>;
   setExpandedActions?: (callback: (prev: Set<number>) => Set<number>) => void;
   setActionRef?: (id: string, element: HTMLDivElement) => void;
@@ -216,7 +218,7 @@ const ActionItem = ({
           citation: {
             start_idx: 0,
             end_idx: 0,
-            transcript_idx: undefined,
+            transcript_idx: transcriptIdx,
             block_idx: highLevelAction.first_block_idx,
             metadata_key: undefined,
             start_pattern: undefined,
@@ -230,8 +232,12 @@ const ActionItem = ({
       agentRunId &&
       citations[0].block_idx !== undefined
     ) {
+      const citation = citations[0];
       citationNav?.navigateToCitation({
-        citation: citations[0],
+        citation: {
+          ...citation,
+          transcript_idx: citation.transcript_idx ?? transcriptIdx,
+        },
         source: 'agent_summary',
       });
     }
@@ -274,7 +280,10 @@ const ActionItem = ({
             e.stopPropagation(); // Prevent the card click from triggering
             if (agentRunId && citation.block_idx !== undefined) {
               citationNav?.navigateToCitation({
-                citation,
+                citation: {
+                  ...citation,
+                  transcript_idx: citation.transcript_idx ?? transcriptIdx,
+                },
                 source: 'agent_summary',
               });
             }
@@ -448,6 +457,7 @@ const ActionItem = ({
               action={lowLevelAction}
               isHighLevel={false}
               agentRunId={agentRunId}
+              transcriptIdx={transcriptIdx}
               observations={observations}
               expandedActions={expandedActions}
               setExpandedActions={setExpandedActions}
@@ -468,6 +478,25 @@ interface AgentSummaryComponent extends React.FC<AgentSummaryProps> {
   ) => void;
 }
 
+const getTranscriptSummaryLabel = (summary: TranscriptActionsSummary) =>
+  summary.transcript_name?.trim() || `Transcript ${summary.transcript_idx + 1}`;
+
+const TranscriptStatusIcon = ({
+  status,
+}: {
+  status: TranscriptActionsSummary['status'];
+}) => {
+  if (status === 'running' || status === 'pending') {
+    return <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />;
+  }
+
+  if (status === 'error') {
+    return <AlertTriangle className="h-3 w-3 text-red-text" />;
+  }
+
+  return <Check className="h-3 w-3 text-green-text" />;
+};
+
 const AgentSummary: React.FC<AgentSummaryProps> = ({
   initialActionIndex,
   agentRunId,
@@ -480,6 +509,35 @@ const AgentSummary: React.FC<AgentSummaryProps> = ({
   const loadingActionsSummaryForTranscriptId = useAppSelector(
     (state) => state.transcript?.loadingActionsSummaryForTranscriptId
   );
+  const isLoadingActionsSummary =
+    loadingActionsSummaryForTranscriptId === agentRunId;
+
+  const transcriptSummaries = useMemo<TranscriptActionsSummary[]>(() => {
+    if (!actionsSummary) {
+      return [];
+    }
+
+    if (actionsSummary.transcript_summaries?.length) {
+      return actionsSummary.transcript_summaries;
+    }
+
+    return [
+      {
+        transcript_id: 'legacy-transcript-0',
+        transcript_idx: 0,
+        transcript_name: null,
+        transcript_group_id: null,
+        low_level: actionsSummary.low_level,
+        high_level: actionsSummary.high_level,
+        observations: actionsSummary.observations,
+        status: isLoadingActionsSummary ? 'running' : 'complete',
+      },
+    ];
+  }, [actionsSummary, isLoadingActionsSummary]);
+
+  const [selectedTranscriptId, setSelectedTranscriptId] = useState<
+    string | undefined
+  >();
 
   // Add state to track expanded high-level actions
   const [expandedActions, setExpandedActions] = useState<Set<number>>(
@@ -488,6 +546,39 @@ const AgentSummary: React.FC<AgentSummaryProps> = ({
   // Update ref type to use string keys to differentiate high/low level actions
   const actionRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const selectedTranscriptSummary =
+    transcriptSummaries.find(
+      (summary) => summary.transcript_id === selectedTranscriptId
+    ) ??
+    transcriptSummaries.find(
+      (summary) => summary.status === 'running' || summary.status === 'complete'
+    ) ??
+    transcriptSummaries[0];
+
+  useEffect(() => {
+    if (transcriptSummaries.length === 0) {
+      setSelectedTranscriptId(undefined);
+      return;
+    }
+
+    const hasSelectedTranscript = transcriptSummaries.some(
+      (summary) => summary.transcript_id === selectedTranscriptId
+    );
+    if (hasSelectedTranscript) {
+      return;
+    }
+
+    const nextSelectedTranscript =
+      transcriptSummaries.find((summary) => summary.status === 'running') ??
+      transcriptSummaries.find((summary) => summary.status === 'complete') ??
+      transcriptSummaries[0];
+    setSelectedTranscriptId(nextSelectedTranscript.transcript_id);
+  }, [selectedTranscriptId, transcriptSummaries]);
+
+  useEffect(() => {
+    actionRefs.current.clear();
+    setExpandedActions(new Set());
+  }, [selectedTranscriptSummary?.transcript_id]);
 
   // Helper function to set action refs
   const setActionRef = useCallback((id: string, element: HTMLDivElement) => {
@@ -497,17 +588,17 @@ const AgentSummary: React.FC<AgentSummaryProps> = ({
   // Scroll to action function
   const scrollToAction = useCallback(
     (actionIndex: number) => {
-      if (!actionsSummary) return;
+      if (!selectedTranscriptSummary) return;
 
       // First try to find and scroll to the low-level action directly
       const lowLevelRefId = `low-${actionIndex}`;
       const lowLevelElement = actionRefs.current.get(lowLevelRefId);
 
       // Find which high-level action contains our target action index
-      const containingHighLevelAction = actionsSummary.high_level?.find(
-        (highLevelAction) =>
+      const containingHighLevelAction =
+        selectedTranscriptSummary.high_level?.find((highLevelAction) =>
           highLevelAction.action_unit_indices.includes(actionIndex)
-      );
+        );
 
       if (containingHighLevelAction) {
         // Expand this high-level action first
@@ -534,7 +625,7 @@ const AgentSummary: React.FC<AgentSummaryProps> = ({
         });
       }
     },
-    [actionsSummary]
+    [selectedTranscriptSummary]
   );
 
   // Request summary
@@ -559,10 +650,10 @@ const AgentSummary: React.FC<AgentSummaryProps> = ({
 
   // Scroll to initial action index when summary loads
   useEffect(() => {
-    if (actionsSummary && initialActionIndex !== undefined) {
+    if (selectedTranscriptSummary && initialActionIndex !== undefined) {
       scrollToAction(initialActionIndex);
     }
-  }, [actionsSummary, initialActionIndex, scrollToAction]);
+  }, [selectedTranscriptSummary, initialActionIndex, scrollToAction]);
 
   // Loading indicator component for reuse
   const LoadingIndicator = () => (
@@ -580,29 +671,47 @@ const AgentSummary: React.FC<AgentSummaryProps> = ({
 
   // Find low-level actions that aren't associated with any high-level action
   const getOrphanedLowLevelActions = () => {
-    if (!actionsSummary?.low_level || !actionsSummary?.high_level) {
-      return actionsSummary?.low_level || [];
+    if (
+      !selectedTranscriptSummary?.low_level ||
+      !selectedTranscriptSummary?.high_level
+    ) {
+      return selectedTranscriptSummary?.low_level || [];
     }
 
     // Collect all action_unit_idx values that are included in high-level actions
     const includedActionUnitIds = new Set<number>();
-    actionsSummary.high_level.forEach((highLevelAction) => {
+    selectedTranscriptSummary.high_level.forEach((highLevelAction) => {
       highLevelAction.action_unit_indices.forEach((idx) => {
         includedActionUnitIds.add(idx);
       });
     });
 
     // Return low-level actions that aren't included in any high-level action
-    return actionsSummary.low_level.filter(
+    return selectedTranscriptSummary.low_level.filter(
       (lowLevelAction) =>
         !includedActionUnitIds.has(lowLevelAction.action_unit_idx)
     );
   };
 
   const orphanedLowLevelActions = getOrphanedLowLevelActions();
-  const hasHighLevelActions =
-    actionsSummary?.high_level && actionsSummary.high_level.length > 0;
+  const hasHighLevelActions = Boolean(
+    selectedTranscriptSummary?.high_level &&
+      selectedTranscriptSummary.high_level.length > 0
+  );
   const hasOrphanedLowLevelActions = orphanedLowLevelActions.length > 0;
+  const hasSelectedLowLevelActions = Boolean(
+    selectedTranscriptSummary?.low_level &&
+      selectedTranscriptSummary.low_level.length > 0
+  );
+  const selectedTranscriptIsLoading =
+    selectedTranscriptSummary?.status === 'pending' ||
+    selectedTranscriptSummary?.status === 'running';
+  const showSelectedTranscriptLoading =
+    selectedTranscriptIsLoading &&
+    !hasHighLevelActions &&
+    !hasOrphanedLowLevelActions &&
+    !hasSelectedLowLevelActions;
+  const hasMultipleTranscriptSummaries = transcriptSummaries.length > 1;
 
   return (
     <TooltipProvider>
@@ -620,28 +729,67 @@ const AgentSummary: React.FC<AgentSummaryProps> = ({
               blocks to see a breakdown.
             </span>
           </div>
+          {actionsSummary && hasMultipleTranscriptSummaries && (
+            <div className="flex flex-wrap gap-1 border-b border-border pb-2">
+              {transcriptSummaries.map((summary) => {
+                const selected =
+                  summary.transcript_id ===
+                  selectedTranscriptSummary?.transcript_id;
+                return (
+                  <button
+                    key={summary.transcript_id}
+                    type="button"
+                    className={cn(
+                      'flex min-w-0 max-w-[12rem] items-center gap-1 rounded-sm border px-2 py-1 text-xs transition-colors',
+                      selected
+                        ? 'border-primary bg-secondary text-primary'
+                        : 'border-border text-muted-foreground hover:bg-secondary'
+                    )}
+                    title={getTranscriptSummaryLabel(summary)}
+                    onClick={() => setSelectedTranscriptId(summary.transcript_id)}
+                  >
+                    <span className="truncate">
+                      {getTranscriptSummaryLabel(summary)}
+                    </span>
+                    <TranscriptStatusIcon status={summary.status} />
+                  </button>
+                );
+              })}
+            </div>
+          )}
           {/* Add Behavior Sequence component with observations */}
-          {actionsSummary &&
-            actionsSummary.observations &&
-            actionsSummary.observations.length > 0 && (
+          {selectedTranscriptSummary &&
+            selectedTranscriptSummary.observations.length > 0 && (
               <BehaviorSequence
-                observations={actionsSummary.observations}
-                actionsSummary={actionsSummary}
+                observations={selectedTranscriptSummary.observations}
+                actionsSummary={selectedTranscriptSummary}
                 onActionClick={scrollToAction}
               />
             )}
           {actionsSummary ? (
             <div className="relative pb-2">
+              {selectedTranscriptSummary?.status === 'error' && (
+                <div className="mb-2 rounded-sm border border-red-text/30 bg-background p-2 text-sm text-red-text">
+                  Failed to analyze this transcript
+                  {selectedTranscriptSummary.error
+                    ? `: ${selectedTranscriptSummary.error}`
+                    : '.'}
+                </div>
+              )}
+              {showSelectedTranscriptLoading && <LoadingIndicator />}
+
               {/* Hierarchical view of high-level actions */}
-              {hasHighLevelActions &&
-                actionsSummary.high_level.map((highLevelAction) => (
+              {selectedTranscriptSummary &&
+                hasHighLevelActions &&
+                selectedTranscriptSummary.high_level.map((highLevelAction) => (
                   <ActionItem
                     key={highLevelAction.step_idx}
                     action={highLevelAction}
                     isHighLevel={true}
-                    lowLevelActions={actionsSummary.low_level}
+                    lowLevelActions={selectedTranscriptSummary.low_level}
                     agentRunId={agentRunId}
-                    observations={actionsSummary.observations}
+                    transcriptIdx={selectedTranscriptSummary.transcript_idx}
+                    observations={selectedTranscriptSummary.observations}
                     expandedActions={expandedActions}
                     setExpandedActions={setExpandedActions}
                     setActionRef={setActionRef}
@@ -665,7 +813,8 @@ const AgentSummary: React.FC<AgentSummaryProps> = ({
                       action={lowLevelAction}
                       isHighLevel={false}
                       agentRunId={agentRunId}
-                      observations={actionsSummary.observations}
+                      transcriptIdx={selectedTranscriptSummary?.transcript_idx}
+                      observations={selectedTranscriptSummary?.observations}
                       expandedActions={expandedActions}
                       setExpandedActions={setExpandedActions}
                       setActionRef={setActionRef}
@@ -675,17 +824,19 @@ const AgentSummary: React.FC<AgentSummaryProps> = ({
               )}
 
               {/* Show all low-level actions if there are no high-level actions */}
-              {!hasHighLevelActions &&
+              {selectedTranscriptSummary &&
+                !hasHighLevelActions &&
                 !hasOrphanedLowLevelActions &&
-                actionsSummary.low_level.length > 0 && (
+                selectedTranscriptSummary.low_level.length > 0 && (
                   <>
-                    {actionsSummary.low_level.map((lowLevelAction) => (
+                    {selectedTranscriptSummary.low_level.map((lowLevelAction) => (
                       <ActionItem
                         key={lowLevelAction.action_unit_idx}
                         action={lowLevelAction}
                         isHighLevel={false}
                         agentRunId={agentRunId}
-                        observations={actionsSummary.observations}
+                        transcriptIdx={selectedTranscriptSummary.transcript_idx}
+                        observations={selectedTranscriptSummary.observations}
                         expandedActions={expandedActions}
                         setExpandedActions={setExpandedActions}
                         setActionRef={setActionRef}
@@ -695,9 +846,10 @@ const AgentSummary: React.FC<AgentSummaryProps> = ({
                 )}
 
               {/* Show message if no actions are available */}
-              {!hasHighLevelActions &&
-                !loadingActionsSummaryForTranscriptId &&
-                actionsSummary.low_level.length === 0 && (
+              {selectedTranscriptSummary &&
+                !hasHighLevelActions &&
+                !selectedTranscriptIsLoading &&
+                selectedTranscriptSummary.low_level.length === 0 && (
                   <div className="bg-background rounded-sm p-2 shadow-sm border border-border text-muted-foreground text-sm">
                     No actions available for this agent run.
                   </div>

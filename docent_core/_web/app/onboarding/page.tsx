@@ -48,19 +48,8 @@ const FRAMEWORK_OPTIONS = [
 ];
 
 const PROVIDER_OPTIONS = [
-  { id: 'openai', label: 'OpenAI' },
-  { id: 'anthropic', label: 'Anthropic' },
-  { id: 'google', label: 'Google' },
-  { id: 'azure', label: 'Azure' },
-  { id: 'bedrock', label: 'Bedrock' },
-  { id: 'xai', label: 'xAI' },
-  { id: 'mistral', label: 'Mistral' },
-  { id: 'perplexity', label: 'Perplexity' },
-  { id: 'cerebras', label: 'Cerebras' },
-  { id: 'vllm', label: 'vLLM Self-Host' },
-  { id: 'together', label: 'Together' },
-  { id: 'groq', label: 'Groq' },
-  { id: 'other', label: 'Other' },
+  { id: 'deepseek', label: 'DeepSeek' },
+  { id: 'custom', label: 'Custom endpoint' },
 ];
 
 interface OnboardingData {
