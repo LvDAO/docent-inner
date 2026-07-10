@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import random
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, cast
@@ -22,6 +23,8 @@ from docent_core.docent.services.hodoscope import (
     HODOSCOPE_EMBEDDING_DIM,
     HODOSCOPE_EMBEDDING_MODEL,
     HodoscopeAnalysisConfig,
+    build_hodoscope_projection_view,
+    build_hodoscope_trajectory_paths,
     get_hodoscope_embedding_api_key,
     get_hodoscope_embedding_base_url,
 )
@@ -76,6 +79,55 @@ class HodoscopeActionPoint:
             f"{self.transcript_idx}:"
             f"{self.action_unit_idx}"
         )
+
+
+def sample_hodoscope_actions(
+    actions: list[HodoscopeActionPoint], max_actions: int, seed: int
+) -> list[HodoscopeActionPoint]:
+    """Cap actions with deterministic round-robin coverage across groups and runs."""
+
+    if len(actions) <= max_actions:
+        return actions
+
+    rng = random.Random(seed)
+    buckets: dict[str, dict[str, list[tuple[int, HodoscopeActionPoint]]]] = {}
+    for index, action in enumerate(actions):
+        buckets.setdefault(action.group, {}).setdefault(action.agent_run_id, []).append(
+            (index, action)
+        )
+
+    group_order = list(buckets)
+    rng.shuffle(group_order)
+    run_order_by_group: dict[str, list[str]] = {}
+    run_cursor_by_group: dict[str, int] = {}
+    for group, runs in buckets.items():
+        run_order = list(runs)
+        rng.shuffle(run_order)
+        run_order_by_group[group] = run_order
+        run_cursor_by_group[group] = 0
+        for run_actions in runs.values():
+            rng.shuffle(run_actions)
+
+    selected: list[tuple[int, HodoscopeActionPoint]] = []
+    while len(selected) < max_actions:
+        made_progress = False
+        for group in group_order:
+            run_order = run_order_by_group[group]
+            for _ in range(len(run_order)):
+                cursor = run_cursor_by_group[group]
+                run_id = run_order[cursor % len(run_order)]
+                run_cursor_by_group[group] = cursor + 1
+                run_actions = buckets[group][run_id]
+                if run_actions:
+                    selected.append(run_actions.pop())
+                    made_progress = True
+                    break
+            if len(selected) >= max_actions:
+                break
+        if not made_progress:
+            break
+
+    return [action for _, action in sorted(selected, key=lambda item: item[0])]
 
 
 def _jsonable(value: Any) -> Any:
@@ -326,6 +378,7 @@ def build_hodoscope_outputs(
     config: HodoscopeAnalysisConfig,
     group_by: str,
     source: str,
+    total_action_counts: dict[str, int] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     created_at = datetime.now(UTC).isoformat()
     artifact_summaries: list[dict[str, Any]] = []
@@ -358,18 +411,30 @@ def build_hodoscope_outputs(
         "fields": {"group_by": group_by},
         "embedding_model": config.embedding_model,
         "embedding_dimensionality": config.embedding_dimensionality,
+        "trajectory_manifest": [
+            {
+                "trajectory_id": trajectory_id,
+                "agent_run_id": trajectory_id,
+                "total_action_count": total_action_count,
+            }
+            for trajectory_id, total_action_count in (total_action_counts or {}).items()
+        ],
         "summaries": artifact_summaries,
     }
 
     if not embedded_summaries:
-        return artifact, {
+        projection = {
             "version": HODOSCOPE_FORMAT_VERSION,
             "created_at": created_at,
             "group_by": group_by,
             "projection_method": config.projection_method,
             "groups": [],
             "points": [],
+            "trajectory_paths": build_hodoscope_trajectory_paths(
+                [], total_action_counts=total_action_counts
+            ),
         }
+        return artifact, build_hodoscope_projection_view(projection)
 
     groups = list(dict.fromkeys(str(summary["group"]) for summary in embedded_summaries))
     group_to_idx = {group: idx for idx, group in enumerate(groups)}
@@ -389,7 +454,6 @@ def build_hodoscope_outputs(
     for summary, coord, fps_rank in zip(embedded_summaries, coords, fps_ranks, strict=True):
         group = str(summary["group"])
         group_counts[group] += 1
-        embedding_array = summary["embedding_array"]
         point_rows.append(
             {
                 "id": summary["point_id"],
@@ -405,7 +469,6 @@ def build_hodoscope_outputs(
                 "task_context": summary.get("task_context", ""),
                 "metadata": summary.get("metadata", {}),
                 "group": group,
-                "embedding": encode_embedding(embedding_array),
                 "x": float(coord[0]),
                 "y": float(coord[1]),
                 "fps_rank": int(fps_rank),
@@ -420,5 +483,8 @@ def build_hodoscope_outputs(
         "requested_projection_method": config.projection_method,
         "groups": [{"name": group, "count": group_counts[group]} for group in groups],
         "points": point_rows,
+        "trajectory_paths": build_hodoscope_trajectory_paths(
+            point_rows, total_action_counts=total_action_counts
+        ),
     }
-    return artifact, projection
+    return artifact, build_hodoscope_projection_view(projection)

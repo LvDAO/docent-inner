@@ -1,4 +1,7 @@
+from copy import deepcopy
 from datetime import datetime
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -6,11 +9,22 @@ from docent.data_models import AgentRun, Transcript
 from docent.data_models.chat import AssistantMessage, ToolMessage, UserMessage
 from docent_core._llm_util.providers import openai as openai_provider
 from docent_core.docent.services import hodoscope_pipeline
-from docent_core.docent.services.hodoscope import HodoscopeAnalysisConfig
+from docent_core.docent.services.hodoscope import (
+    HODOSCOPE_CONTEXT_EXCERPT_MAX_CHARS,
+    HodoscopeAnalysisConfig,
+    HodoscopeService,
+    build_hodoscope_metadata_tag_overlay,
+    build_hodoscope_projection_view,
+    build_hodoscope_rubric_tag_overlay,
+    build_hodoscope_trajectory_paths,
+    expand_hodoscope_projection_view,
+    merge_hodoscope_tag_overlay,
+)
 from docent_core.docent.services.hodoscope_pipeline import (
     build_hodoscope_outputs,
     embed_hodoscope_summaries,
     extract_hodoscope_actions,
+    sample_hodoscope_actions,
 )
 
 EMBEDDING_ENV_VARS = [
@@ -42,6 +56,463 @@ def _transcript(
 def _clear_embedding_env(monkeypatch: pytest.MonkeyPatch):
     for env_var in EMBEDDING_ENV_VARS:
         monkeypatch.delenv(env_var, raising=False)
+
+
+def _full_projection_fixture() -> dict:
+    return {
+        "version": 1,
+        "created_at": "2026-07-09T09:09:25+00:00",
+        "group_by": "metadata.model",
+        "projection_method": "tsne",
+        "requested_projection_method": "tsne",
+        "groups": [
+            {"name": "model-a", "count": 1},
+            {"name": "model-b", "count": 1},
+        ],
+        "internal_debug": "not public",
+        "points": [
+            {
+                "id": "run-a:t-a:0:0",
+                "trajectory_id": "run-a",
+                "turn_id": 3,
+                "agent_run_id": "run-a",
+                "transcript_id": "t-a",
+                "transcript_idx": 0,
+                "action_unit_idx": 0,
+                "first_block_idx": 1,
+                "summary": "Inspect logs for a failure",
+                "action_text": "raw action text that must stay private",
+                "task_context": "  " + "context " * 80 + "  ",
+                "metadata": {
+                    "success": True,
+                    "task_name": "terminal-bench/task-a",
+                    "large_private_value": "private" * 100,
+                },
+                "group": "model-a",
+                "embedding": "encoded-full-embedding",
+                "x": -1.25,
+                "y": 4.5,
+                "fps_rank": 0,
+            },
+            {
+                "id": "run-b:t-b:1:2",
+                "trajectory_id": "run-b",
+                "turn_id": 9,
+                "agent_run_id": "run-b",
+                "transcript_id": "t-b",
+                "transcript_idx": 1,
+                "action_unit_idx": 2,
+                "first_block_idx": None,
+                "summary": "Waited too long for a command",
+                "action_text": "fallback\ncontext from the raw action",
+                "task_context": "",
+                "metadata": {
+                    "exception_type": "AgentTimeoutError",
+                    "terminal_outcome": "reward_with_agent_timeout",
+                    "task_id": {"org": "terminal-bench", "name": "task-b"},
+                },
+                "group": "model-b",
+                "embedding": "another-full-embedding",
+                "x": 8.75,
+                "y": -2.0,
+                "fps_rank": 1,
+            },
+        ],
+    }
+
+
+@pytest.mark.unit
+def test_public_hodoscope_projection_is_compact_bounded_and_non_mutating():
+    stored_projection = _full_projection_fixture()
+    stored_projection["tag_catalog"] = [
+        {
+            "id": "stored-tag",
+            "label": "Stored point tag",
+            "source": "point_rubric",
+            "scope": "point",
+            "inherited": False,
+        }
+    ]
+    stored_projection["points"][0]["tag_ids"] = ["stored-tag"]
+    original_projection = deepcopy(stored_projection)
+
+    public_projection = build_hodoscope_projection_view(stored_projection)
+
+    assert stored_projection == original_projection
+    assert public_projection["view_schema_version"] == "hodoscope_projection_view.v2"
+    assert "internal_debug" not in public_projection
+    assert public_projection["groups"] == stored_projection["groups"]
+    assert sum(group["count"] for group in public_projection["groups"]) == len(
+        public_projection["points"]
+    )
+
+    first_point, second_point = public_projection["points"]
+    assert first_point["id"] == "run-a:t-a:0:0"
+    assert first_point["trajectory_id"] == "run-a"
+    assert first_point["turn_id"] == 3
+    assert first_point["agent_run_id"] == "run-a"
+    assert first_point["transcript_id"] == "t-a"
+    assert first_point["transcript_idx"] == 0
+    assert first_point["action_unit_idx"] == 0
+    assert first_point["first_block_idx"] == 1
+    assert first_point["summary"] == "Inspect logs for a failure"
+    assert first_point["x"] == -1.25
+    assert first_point["y"] == 4.5
+    assert first_point["fps_rank"] == 0
+    assert first_point["group"] == "model-a"
+    assert first_point["tag_ids"] == ["stored-tag"]
+    assert second_point["tag_ids"] == []
+    assert public_projection["tag_catalog"][0]["count"] == 1
+    assert first_point["outcome"] == "passed"
+    assert first_point["task_id"] == "terminal-bench/task-a"
+    assert len(first_point["context_excerpt"]) == HODOSCOPE_CONTEXT_EXCERPT_MAX_CHARS
+    assert first_point["context_excerpt"].endswith("…")
+
+    assert second_point["outcome"] == "timeout"
+    assert second_point["exception_type"] == "AgentTimeoutError"
+    assert second_point["task_id"] == "terminal-bench/task-b"
+    assert second_point["context_excerpt"] == "fallback context from the raw action"
+
+    public_point_fields = set(first_point) | set(second_point)
+    assert public_point_fields.isdisjoint({"embedding", "action_text", "task_context", "metadata"})
+    assert public_projection["trajectory_paths"] == [
+        {
+            "trajectory_id": "run-a",
+            "agent_run_id": "run-a",
+            "point_ids": ["run-a:t-a:0:0"],
+            "projected_point_count": 1,
+            "total_action_count": None,
+            "complete": None,
+            "path_scope": "projected_points",
+        },
+        {
+            "trajectory_id": "run-b",
+            "agent_run_id": "run-b",
+            "point_ids": ["run-b:t-b:1:2"],
+            "projected_point_count": 1,
+            "total_action_count": None,
+            "complete": None,
+            "path_scope": "projected_points",
+        },
+    ]
+    assert build_hodoscope_projection_view(public_projection) == public_projection
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_hodoscope_service_keeps_legacy_full_projection_and_artifact_available():
+    stored_projection = _full_projection_fixture()
+    full_artifact = {
+        "summaries": [
+            {
+                "embedding": "full-artifact-embedding",
+                "action_text": "full artifact action text",
+                "metadata": {"private": "still stored"},
+            }
+        ]
+    }
+    session = SimpleNamespace(
+        execute=AsyncMock(
+            side_effect=[
+                SimpleNamespace(one_or_none=lambda: (stored_projection, full_artifact, {})),
+                SimpleNamespace(one_or_none=lambda: (stored_projection, {})),
+                SimpleNamespace(scalar_one_or_none=lambda: full_artifact),
+            ]
+        )
+    )
+    service = HodoscopeService(session=session)  # type: ignore[arg-type]
+    ctx = SimpleNamespace(collection_id="collection-id")
+
+    stored_projection_response = await service.get_projection(ctx, "analysis-id")  # type: ignore[arg-type]
+    public_projection = await service.get_projection(  # type: ignore[arg-type]
+        ctx, "analysis-id", compact=True
+    )
+    returned_artifact = await service.get_artifact(ctx, "analysis-id")  # type: ignore[arg-type]
+
+    assert public_projection is not None
+    assert stored_projection_response is stored_projection
+    assert stored_projection_response["points"][0]["embedding"] == "encoded-full-embedding"
+    assert "embedding" not in public_projection["points"][0]
+    assert stored_projection["points"][0]["embedding"] == "encoded-full-embedding"
+    assert stored_projection["points"][0]["action_text"] == "raw action text that must stay private"
+    assert returned_artifact is full_artifact
+    assert returned_artifact["summaries"][0]["embedding"] == "full-artifact-embedding"
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_hodoscope_analysis_list_explicit_locale_overrides_user_preference():
+    session = SimpleNamespace(
+        execute=AsyncMock(
+            return_value=SimpleNamespace(
+                mappings=lambda: SimpleNamespace(all=lambda: []),
+            )
+        )
+    )
+    service = HodoscopeService(session=session)  # type: ignore[arg-type]
+    ctx = SimpleNamespace(
+        collection_id="collection-id",
+        user=SimpleNamespace(preferred_locale="en"),
+    )
+
+    assert await service.list_analyses(ctx, locale="zh-CN") == []  # type: ignore[arg-type]
+
+    statement = session.execute.await_args.args[0]
+    assert any(
+        getattr(criterion.right, "value", None) == "zh-CN"
+        for criterion in statement._where_criteria
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_hodoscope_service_adds_metadata_and_latest_rubric_tags_at_read_time():
+    stored_projection = _full_projection_fixture()
+    rubric_row = {
+        "agent_run_id": "run-a",
+        "rubric_id": "rubric-1",
+        "rubric_version": 4,
+        "rubric_text": "Investigates recovery behavior",
+        "centroid_id": "centroid-1",
+        "centroid": "Retries after failure",
+        "output": {"label": "match"},
+    }
+    session = SimpleNamespace(
+        execute=AsyncMock(
+            side_effect=[
+                SimpleNamespace(one_or_none=lambda: (stored_projection, {"locale": "zh-CN"})),
+                SimpleNamespace(all=lambda: [("run-a", {"custom_tag": "needs-review"})]),
+                SimpleNamespace(mappings=lambda: SimpleNamespace(all=lambda: [rubric_row])),
+            ]
+        )
+    )
+    service = HodoscopeService(session=session)  # type: ignore[arg-type]
+    ctx = SimpleNamespace(collection_id="collection-id")
+
+    projection = await service.get_projection(  # type: ignore[arg-type]
+        ctx,
+        "analysis-id",
+        compact=True,
+        tag_by="metadata.custom_tag",
+        include_rubric_tags=True,
+    )
+
+    assert projection is not None
+    assert session.execute.await_count == 3
+    assert len(projection["points"][0]["tag_ids"]) == 2
+    assert projection["points"][1]["tag_ids"] == []
+    assert {tag["source"] for tag in projection["tag_catalog"]} == {
+        "metadata",
+        "rubric_cluster",
+    }
+    assert {tag["count"] for tag in projection["tag_catalog"]} == {1}
+
+    rubric_statement = session.execute.await_args_list[2].args[0]
+    locale_predicates = {
+        criterion.left.table.name: criterion.right.value
+        for criterion in rubric_statement._where_criteria
+        if getattr(criterion.left, "name", None) == "locale"
+    }
+    assert locale_predicates == {
+        "judge_results": "zh-CN",
+        "rubric_centroids": "zh-CN",
+    }
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_hodoscope_rubric_tags_default_legacy_analysis_locale_to_english():
+    stored_projection = _full_projection_fixture()
+    session = SimpleNamespace(
+        execute=AsyncMock(
+            side_effect=[
+                SimpleNamespace(one_or_none=lambda: (stored_projection, {})),
+                SimpleNamespace(mappings=lambda: SimpleNamespace(all=lambda: [])),
+            ]
+        )
+    )
+    service = HodoscopeService(session=session)  # type: ignore[arg-type]
+    ctx = SimpleNamespace(collection_id="collection-id")
+
+    projection = await service.get_projection(  # type: ignore[arg-type]
+        ctx,
+        "analysis-id",
+        compact=True,
+        include_rubric_tags=True,
+    )
+
+    assert projection is not None
+    rubric_statement = session.execute.await_args_list[1].args[0]
+    locale_predicates = {
+        criterion.left.table.name: criterion.right.value
+        for criterion in rubric_statement._where_criteria
+        if getattr(criterion.left, "name", None) == "locale"
+    }
+    assert locale_predicates == {
+        "judge_results": "en",
+        "rubric_centroids": "en",
+    }
+
+
+@pytest.mark.unit
+def test_compact_stored_projection_expands_to_legacy_full_shape():
+    full_projection = _full_projection_fixture()
+    compact_projection = build_hodoscope_projection_view(full_projection)
+    artifact = {
+        "summaries": [
+            {
+                key: deepcopy(point[key])
+                for key in ("action_text", "task_context", "metadata", "embedding")
+            }
+            for point in full_projection["points"]
+        ]
+    }
+
+    expanded = expand_hodoscope_projection_view(compact_projection, artifact)
+
+    assert "view_schema_version" not in expanded
+    for expanded_point, full_point in zip(
+        expanded["points"], full_projection["points"], strict=True
+    ):
+        for key in ("action_text", "task_context", "metadata", "embedding"):
+            assert expanded_point[key] == full_point[key]
+
+
+@pytest.mark.unit
+def test_public_hodoscope_projection_reads_docent_scores_metadata():
+    stored_projection = _full_projection_fixture()
+    stored_projection["points"][0]["metadata"] = {"scores": {"passed": True, "reward": 1.0}}
+
+    public_projection = build_hodoscope_projection_view(stored_projection)
+
+    assert public_projection["points"][0]["outcome"] == "passed"
+
+
+@pytest.mark.unit
+def test_hodoscope_legacy_trajectory_path_uses_transcript_and_action_order():
+    points = [
+        {
+            "id": "run:t-2:1:0",
+            "agent_run_id": "run",
+            "trajectory_id": "run",
+            "transcript_idx": 1,
+            "action_unit_idx": 0,
+        },
+        {
+            "id": "run:t-1:0:2",
+            "agent_run_id": "run",
+            "trajectory_id": "run",
+            "transcript_idx": 0,
+            "action_unit_idx": 2,
+        },
+        {
+            "id": "run:t-1:0:1",
+            "agent_run_id": "run",
+            "trajectory_id": "run",
+            "transcript_idx": 0,
+            "action_unit_idx": 1,
+        },
+    ]
+
+    paths = build_hodoscope_trajectory_paths(points)
+
+    assert paths == [
+        {
+            "trajectory_id": "run",
+            "agent_run_id": "run",
+            "point_ids": ["run:t-1:0:1", "run:t-1:0:2", "run:t-2:1:0"],
+            "projected_point_count": 3,
+            "total_action_count": None,
+            "complete": None,
+            "path_scope": "projected_points",
+        }
+    ]
+
+
+@pytest.mark.unit
+def test_metadata_tags_are_bounded_deterministic_and_merge_with_stored_tags():
+    metadata_by_run = {
+        "run-b": {"custom": {"tags": ["beta", "alpha", "alpha"]}},
+        "run-a": {"metadata.custom.tags": ["alpha", {"kind": "failure", "detail": "x" * 300}]},
+    }
+    catalog, tag_ids_by_run = build_hodoscope_metadata_tag_overlay(
+        metadata_by_run, "metadata.custom.tags"
+    )
+    projection = {
+        "tag_catalog": [
+            {
+                "id": "stored",
+                "label": "Stored",
+                "source": "point_rubric",
+                "scope": "point",
+                "inherited": False,
+            }
+        ],
+        "points": [
+            {"id": "a", "agent_run_id": "run-a", "tag_ids": ["stored"]},
+            {"id": "b", "agent_run_id": "run-b", "tag_ids": []},
+        ],
+    }
+
+    merged = merge_hodoscope_tag_overlay(projection, catalog, tag_ids_by_run)
+    repeated = merge_hodoscope_tag_overlay(merged, catalog, tag_ids_by_run)
+
+    assert merged == repeated
+    assert projection["points"][0]["tag_ids"] == ["stored"]
+    assert all(definition["scope"] == "trajectory" for definition in catalog)
+    assert all(definition["inherited"] is True for definition in catalog)
+    assert all(definition["source_label"] == "metadata.custom.tags" for definition in catalog)
+    assert len(tag_ids_by_run["run-a"]) == 2
+    assert len(tag_ids_by_run["run-b"]) == 2
+    counts = {definition["id"]: definition["count"] for definition in merged["tag_catalog"]}
+    assert counts["stored"] == 1
+    assert sorted(counts[tag_id] for tag_id in set(tag_ids_by_run["run-a"])) == [1, 2]
+
+
+@pytest.mark.unit
+def test_rubric_cluster_rows_become_neutral_trajectory_tags():
+    rows = [
+        {
+            "agent_run_id": "run-a",
+            "rubric_id": "rubric-1",
+            "rubric_version": 2,
+            "rubric_text": "Checks recovery behavior\nMore detail",
+            "centroid_id": "centroid-1",
+            "centroid": "Retries after a failed command",
+            "output": {"label": True, "explanation": "..."},
+        },
+        {
+            "agent_run_id": "run-b",
+            "rubric_id": "rubric-1",
+            "rubric_version": 2,
+            "rubric_text": "Checks recovery behavior\nMore detail",
+            "centroid_id": "centroid-1",
+            "centroid": "Retries after a failed command",
+            "output": {"label": True, "explanation": "..."},
+        },
+    ]
+
+    catalog, tag_ids_by_run = build_hodoscope_rubric_tag_overlay(rows)
+
+    assert len(catalog) == 1
+    assert tag_ids_by_run["run-a"] == tag_ids_by_run["run-b"]
+    assert catalog[0]["source"] == "rubric_cluster"
+    assert catalog[0]["scope"] == "trajectory"
+    assert catalog[0]["inherited"] is True
+    assert catalog[0]["rubric_id"] == "rubric-1"
+    assert catalog[0]["rubric_version"] == 2
+    assert catalog[0]["centroid_id"] == "centroid-1"
+    assert catalog[0]["result_label"] == "true"
+    assert catalog[0]["source_label"] == "Checks recovery behavior · true"
+    assert "positive" not in catalog[0]
+
+
+@pytest.mark.unit
+def test_hodoscope_config_keeps_legacy_run_limit_range():
+    config = HodoscopeAnalysisConfig(limit=10_000)
+
+    assert config.limit == 10_000
+    assert config.max_actions == 5_000
 
 
 @pytest.mark.unit
@@ -130,7 +601,88 @@ def test_extract_hodoscope_actions_resolves_flat_metadata_field_names():
 
 
 @pytest.mark.unit
-def test_build_hodoscope_outputs_encodes_artifact_and_projection_points(
+def test_sample_hodoscope_actions_is_bounded_deterministic_and_ordered():
+    actions = [
+        hodoscope_pipeline.HodoscopeActionPoint(
+            agent_run_id=f"run-{index}",
+            transcript_id=f"transcript-{index}",
+            transcript_idx=0,
+            action_unit_idx=0,
+            first_block_idx=0,
+            action_text=f"action {index}",
+            task_context="",
+            metadata={},
+            group="group",
+        )
+        for index in range(30)
+    ]
+
+    sampled = sample_hodoscope_actions(actions, max_actions=10, seed=42)
+    repeated = sample_hodoscope_actions(actions, max_actions=10, seed=42)
+
+    assert len(sampled) == 10
+    assert [action.agent_run_id for action in sampled] == [
+        action.agent_run_id for action in repeated
+    ]
+    assert [actions.index(action) for action in sampled] == sorted(
+        actions.index(action) for action in sampled
+    )
+
+
+@pytest.mark.unit
+def test_sample_hodoscope_actions_preserves_small_groups_and_rotates_runs():
+    actions = [
+        hodoscope_pipeline.HodoscopeActionPoint(
+            agent_run_id=f"large-run-{index % 2}",
+            transcript_id=f"large-{index}",
+            transcript_idx=0,
+            action_unit_idx=index,
+            first_block_idx=index,
+            action_text=f"large action {index}",
+            task_context="",
+            metadata={},
+            group="large",
+        )
+        for index in range(28)
+    ]
+    actions.extend(
+        [
+            hodoscope_pipeline.HodoscopeActionPoint(
+                agent_run_id="small-run",
+                transcript_id="small",
+                transcript_idx=0,
+                action_unit_idx=0,
+                first_block_idx=0,
+                action_text="small action",
+                task_context="",
+                metadata={},
+                group="small",
+            ),
+            hodoscope_pipeline.HodoscopeActionPoint(
+                agent_run_id="tiny-run",
+                transcript_id="tiny",
+                transcript_idx=0,
+                action_unit_idx=0,
+                first_block_idx=0,
+                action_text="tiny action",
+                task_context="",
+                metadata={},
+                group="tiny",
+            ),
+        ]
+    )
+
+    sampled = sample_hodoscope_actions(actions, max_actions=10, seed=7)
+
+    assert {action.group for action in sampled} == {"large", "small", "tiny"}
+    assert {action.agent_run_id for action in sampled if action.group == "large"} == {
+        "large-run-0",
+        "large-run-1",
+    }
+
+
+@pytest.mark.unit
+def test_build_hodoscope_outputs_keeps_artifact_full_and_projection_compact(
     monkeypatch: pytest.MonkeyPatch,
 ):
     _clear_embedding_env(monkeypatch)
@@ -174,12 +726,17 @@ def test_build_hodoscope_outputs_encodes_artifact_and_projection_points(
         HodoscopeAnalysisConfig(projection_method="tsne"),
         group_by="model",
         source="docent:test",
+        total_action_counts={"run-a": 1, "run-b": 3},
     )
 
     assert artifact["source"] == "docent:test"
     assert artifact["embedding_model"] == "text-embedding-3-small"
     assert len(artifact["summaries"]) == 2
     assert all(summary["embedding"] for summary in artifact["summaries"])
+    assert artifact["trajectory_manifest"] == [
+        {"trajectory_id": "run-a", "agent_run_id": "run-a", "total_action_count": 1},
+        {"trajectory_id": "run-b", "agent_run_id": "run-b", "total_action_count": 3},
+    ]
 
     assert projection["requested_projection_method"] == "tsne"
     assert projection["projection_method"] == "pca"
@@ -188,9 +745,32 @@ def test_build_hodoscope_outputs_encodes_artifact_and_projection_points(
     assert len(projection["points"]) == 2
     assert projection["points"][0]["agent_run_id"] == "run-a"
     assert projection["points"][0]["first_block_idx"] == 1
-    assert projection["points"][0]["embedding"]
+    assert projection["points"][0]["context_excerpt"] == "debug timeout"
+    assert set(projection["points"][0]).isdisjoint(
+        {"embedding", "action_text", "task_context", "metadata"}
+    )
     assert isinstance(projection["points"][0]["x"], float)
     assert isinstance(projection["points"][0]["fps_rank"], int)
+    assert projection["trajectory_paths"] == [
+        {
+            "trajectory_id": "run-a",
+            "agent_run_id": "run-a",
+            "point_ids": ["run-a:t-a:0:0"],
+            "projected_point_count": 1,
+            "total_action_count": 1,
+            "complete": True,
+            "path_scope": "projected_points",
+        },
+        {
+            "trajectory_id": "run-b",
+            "agent_run_id": "run-b",
+            "point_ids": ["run-b:t-b:0:0"],
+            "projected_point_count": 1,
+            "total_action_count": 3,
+            "complete": False,
+            "path_scope": "projected_points",
+        },
+    ]
 
 
 @pytest.mark.unit
@@ -264,10 +844,13 @@ def test_openai_compatible_embedding_client_accepts_call_overrides(
         base_url="http://localhost:8001/v1",
     )
 
-    assert openai_provider.get_openai_compatible_embedding_config_error(
-        api_key="override-key",
-        base_url="http://localhost:8001/v1",
-    ) is None
+    assert (
+        openai_provider.get_openai_compatible_embedding_config_error(
+            api_key="override-key",
+            base_url="http://localhost:8001/v1",
+        )
+        is None
+    )
     assert str(client.base_url).rstrip("/") == "http://localhost:8001/v1"
     assert client.api_key == "override-key"
 

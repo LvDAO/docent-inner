@@ -40,6 +40,10 @@ export const workspaceEn = {
   'workspace.viewer.chartDescription': 'Plot trends in your data',
   'workspace.viewer.runList': 'Agent run list',
   'workspace.viewer.matchingRuns': 'Runs matching the current view: {count}',
+  'workspace.viewer.resizeChartsHodoscope':
+    'Resize charts and Hodoscope panels',
+  'workspace.viewer.resizeHodoscopeRuns':
+    'Resize Hodoscope and agent run panels',
 
   'workspace.table.agentRun': 'Agent run',
   'workspace.table.sortAscending': 'Sort {field} in ascending order',
@@ -123,6 +127,8 @@ export const workspaceZhCN = {
   'workspace.viewer.chartDescription': '绘制数据趋势',
   'workspace.viewer.runList': '智能体运行记录',
   'workspace.viewer.matchingRuns': '当前视图匹配 {count} 条运行记录',
+  'workspace.viewer.resizeChartsHodoscope': '调整图表与 Hodoscope 面板大小',
+  'workspace.viewer.resizeHodoscopeRuns': '调整 Hodoscope 与智能体运行面板大小',
 
   'workspace.table.agentRun': '智能体运行',
   'workspace.table.sortAscending': '按 {field} 升序排列',

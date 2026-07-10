@@ -1,5 +1,6 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { BASE_URL } from '@/app/constants';
+import type { Locale } from '@/lib/i18n/locales';
 
 export type HodoscopeAnalysisStatus =
   'pending' | 'running' | 'complete' | 'error' | 'canceled';
@@ -7,10 +8,44 @@ export type HodoscopeAnalysisStatus =
 export type HodoscopeProjectionMethod =
   'pca' | 'tsne' | 'umap' | 'trimap' | 'pacmap';
 
+export type HodoscopeTagSource =
+  'metadata' | 'rubric_cluster' | 'point_rubric' | 'manual';
+
+export type HodoscopeTagScope = 'trajectory' | 'point';
+
+export interface HodoscopeTagCatalogEntry {
+  id: string;
+  label: string;
+  facet: string;
+  source: HodoscopeTagSource;
+  scope: HodoscopeTagScope;
+  inherited: boolean;
+  count: number;
+  source_label?: string;
+  field?: string;
+  rubric_id?: string;
+  rubric_version?: number;
+  centroid_id?: string;
+  result_type?: string;
+  result_label?: string;
+}
+
+export interface HodoscopeTrajectoryPath {
+  trajectory_id: string;
+  agent_run_id: string;
+  point_ids: string[];
+  path_scope: 'projected_points';
+  projected_point_count: number;
+  total_action_count: number | null;
+  complete: boolean | null;
+}
+
 export interface HodoscopeAnalysisConfig {
   name?: string;
+  locale?: Locale;
   group_by?: string | null;
   limit?: number;
+  max_actions?: number;
   seed?: number;
   projection_method?: HodoscopeProjectionMethod;
 }
@@ -42,24 +77,29 @@ export interface HodoscopeProjectionPoint {
   action_unit_idx: number;
   first_block_idx: number | null;
   summary: string;
-  action_text: string;
-  task_context: string;
-  metadata: Record<string, unknown>;
+  context_excerpt: string;
   group: string;
-  embedding: string;
+  outcome?: string;
+  exception_type?: string;
+  task_id?: string;
   x: number;
   y: number;
   fps_rank: number;
+  tag_ids?: string[];
 }
 
 export interface HodoscopeProjection {
   version: number;
+  view_schema_version?:
+    'hodoscope_projection_view.v1' | 'hodoscope_projection_view.v2';
   created_at: string;
   group_by: string;
   projection_method: string;
   requested_projection_method?: string;
   groups: Array<{ name: string; count: number }>;
   points: HodoscopeProjectionPoint[];
+  tag_catalog?: HodoscopeTagCatalogEntry[];
+  trajectory_paths?: HodoscopeTrajectoryPath[];
 }
 
 export const hodoscopeApi = createApi({
@@ -72,9 +112,12 @@ export const hodoscopeApi = createApi({
   endpoints: (build) => ({
     listHodoscopeAnalyses: build.query<
       HodoscopeAnalysisSummary[],
-      { collectionId: string }
+      { collectionId: string; locale: Locale }
     >({
-      query: ({ collectionId }) => `/${collectionId}/analyses`,
+      query: ({ collectionId, locale }) => ({
+        url: `/${collectionId}/analyses`,
+        params: { locale },
+      }),
       providesTags: ['HodoscopeAnalysis'],
     }),
     getHodoscopeAnalysis: build.query<
@@ -89,10 +132,27 @@ export const hodoscopeApi = createApi({
     }),
     getHodoscopeProjection: build.query<
       HodoscopeProjection,
-      { collectionId: string; analysisId: string }
+      {
+        collectionId: string;
+        analysisId: string;
+        locale: Locale;
+        tagBy?: string | null;
+        includeRubricTags?: boolean;
+      }
     >({
-      query: ({ collectionId, analysisId }) =>
-        `/${collectionId}/analyses/${analysisId}/projection`,
+      query: ({
+        collectionId,
+        analysisId,
+        tagBy,
+        includeRubricTags = true,
+      }) => ({
+        url: `/${collectionId}/analyses/${analysisId}/projection`,
+        params: {
+          compact: true,
+          include_rubric_tags: includeRubricTags,
+          ...(tagBy ? { tag_by: tagBy } : {}),
+        },
+      }),
       providesTags: (_result, _error, { analysisId }) => [
         { type: 'HodoscopeProjection', id: analysisId },
       ],

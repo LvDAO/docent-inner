@@ -32,7 +32,6 @@ import {
 } from '../api/chartApi';
 import { ChartSpec } from '../types/collectionTypes';
 import { skipToken } from '@reduxjs/toolkit/query';
-import { cn } from '@/lib/utils';
 import { useLocale } from '../contexts/LocaleContext';
 
 export function ChartsArea() {
@@ -183,8 +182,8 @@ export function ChartsArea() {
   // Ensure consistent SSR/CSR output before collectionId is known
   if (!collectionId) {
     return (
-      <div className="flex flex-col resize-y overflow-y-auto min-h-[200px] h-[35%]">
-        <div className="flex items-center justify-center p-4 text-sm">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="flex flex-1 items-center justify-center p-4 text-sm">
           <Loader2 size={16} className="animate-spin text-muted-foreground" />
         </div>
       </div>
@@ -194,8 +193,8 @@ export function ChartsArea() {
   // Handle loading and error states
   if (isLoading) {
     return (
-      <div className="flex flex-col resize-y overflow-y-auto min-h-[200px] h-[35%]">
-        <div className="flex items-center justify-center p-4 text-sm">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="flex flex-1 items-center justify-center p-4 text-sm">
           <Loader2 size={16} className="animate-spin text-muted-foreground" />
         </div>
       </div>
@@ -204,8 +203,8 @@ export function ChartsArea() {
 
   if (error) {
     return (
-      <div className="flex flex-col resize-y overflow-y-auto min-h-[200px] h-[35%]">
-        <div className="flex items-center justify-center p-4 text-red-500 text-sm">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="flex flex-1 items-center justify-center p-4 text-sm text-red-500">
           {t('charts.area.errorLoading')}
         </div>
       </div>
@@ -213,14 +212,9 @@ export function ChartsArea() {
   }
 
   return (
-    <div
-      className={cn(
-        'flex flex-col overflow-y-auto',
-        activeChart && 'resize-y h-[35%] min-h-[200px]'
-      )}
-    >
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {/* Tab Bar */}
-      <div className="flex items-end">
+      <div className="flex shrink-0 items-end overflow-x-auto scrollbar-hide">
         {charts.map((chart: ChartSpec) => (
           <div
             key={chart.id}

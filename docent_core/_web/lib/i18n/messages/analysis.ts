@@ -9,12 +9,21 @@ export const analysisEn = {
   'analysis.hodoscope.noMapData': 'No map data yet',
   'analysis.hodoscope.actionsAcrossGroups':
     '{actions} actions across {groups} groups',
+  'analysis.hodoscope.tagsCount': '{count} tags',
   'analysis.hodoscope.stagePoints': '{stage} · {points} points',
   'analysis.hodoscope.groupBy': 'Group by',
   'analysis.hodoscope.autoDetectModel': 'Auto detect model',
+  'analysis.hodoscope.tagBy': 'Tag by',
+  'analysis.hodoscope.tagByAria': 'Add a metadata field as Hodoscope tags',
+  'analysis.hodoscope.tagByHelp':
+    'Adds view-time metadata tags without rerunning the analysis',
+  'analysis.hodoscope.none': 'None',
   'analysis.hodoscope.maxRuns': 'Max runs',
+  'analysis.hodoscope.maxPoints': 'Max points',
   'analysis.hodoscope.projection': 'Projection',
   'analysis.hodoscope.run': 'Run',
+  'analysis.hodoscope.downloadJson': 'Download Hodoscope JSON artifact',
+  'analysis.hodoscope.progressLabel': '{name} {status}',
   'analysis.hodoscope.empty':
     'Run Hodoscope to project action summaries for this collection.',
   'analysis.hodoscope.groups': 'Groups',
@@ -29,6 +38,121 @@ export const analysisEn = {
   'analysis.hodoscope.stage.complete': 'Complete',
   'analysis.hodoscope.stage.error': 'Error',
   'analysis.hodoscope.stage.canceled': 'Canceled',
+
+  'analysis.hodoscope.outcome.passed': 'Passed',
+  'analysis.hodoscope.outcome.failed': 'Failed',
+  'analysis.hodoscope.outcome.timeout': 'Timeout',
+  'analysis.hodoscope.outcome.exception': 'Exception',
+  'analysis.hodoscope.outcome.unknown': 'Unknown',
+  'analysis.hodoscope.tagSource.metadata': 'Metadata',
+  'analysis.hodoscope.tagSource.rubricCluster': 'Rubric cluster',
+  'analysis.hodoscope.tagSource.pointRubric': 'Point rubric',
+  'analysis.hodoscope.tagSource.manual': 'Manual',
+  'analysis.hodoscope.tagScope.point': 'Point',
+  'analysis.hodoscope.tagScope.runInherited': 'Run · inherited',
+  'analysis.hodoscope.search.placeholder':
+    'Search actions, tags, tasks, or errors',
+  'analysis.hodoscope.search.aria': 'Search embedding points',
+  'analysis.hodoscope.colorBy': 'Color embedding by',
+  'analysis.hodoscope.color.outcome': 'Outcome',
+  'analysis.hodoscope.color.group': 'Group',
+  'analysis.hodoscope.tags.filterButton': 'Filter by tags',
+  'analysis.hodoscope.tags.filterButtonActive':
+    'Filter by tags, {count} active',
+  'analysis.hodoscope.tags.label': 'Tags',
+  'analysis.hodoscope.tags.filterTitle': 'Filter by tags',
+  'analysis.hodoscope.tags.filterLogic':
+    'OR within a facet · AND across facets',
+  'analysis.hodoscope.tags.clear': 'Clear',
+  'analysis.hodoscope.tags.searchPlaceholder': 'Search tag labels or sources',
+  'analysis.hodoscope.tags.searchAria': 'Search available Hodoscope tags',
+  'analysis.hodoscope.tags.filterBy': 'Filter by {source}: {label}',
+  'analysis.hodoscope.tags.resultLimit':
+    'Showing the first {limit} of {count} tags. Search to narrow the list.',
+  'analysis.hodoscope.tags.noMatches': 'No tags match this search.',
+  'analysis.hodoscope.tags.activeFilters': 'Tag filters',
+  'analysis.hodoscope.tags.removeFilter': 'Remove tag filter {source}: {label}',
+  'analysis.hodoscope.tags.sourceAndLabel': '{source}: {label}',
+  'analysis.hodoscope.tags.clearAll': 'Clear all',
+  'analysis.hodoscope.tags.actionTags': 'Action tags',
+  'analysis.hodoscope.tags.attachedCount': '{count} attached',
+  'analysis.hodoscope.tags.pointTags': 'Point tags',
+  'analysis.hodoscope.tags.runTagsInherited': 'Run tags · inherited',
+  'analysis.hodoscope.tags.noneAttached':
+    'No tags are attached to this action.',
+  'analysis.hodoscope.path.toolbarLabel': 'Path',
+  'analysis.hodoscope.path.hideSelected': 'Hide selected run path',
+  'analysis.hodoscope.path.showSelected': 'Show selected run path',
+  'analysis.hodoscope.path.selectActionWithData':
+    'Select an action with path data',
+  'analysis.hodoscope.map.zoomOut': 'Zoom out',
+  'analysis.hodoscope.map.zoomIn': 'Zoom in',
+  'analysis.hodoscope.map.fit': 'Fit',
+  'analysis.hodoscope.map.fitEmbedding': 'Fit embedding',
+  'analysis.hodoscope.map.panZoomHelp':
+    'Drag to pan · wheel or buttons to zoom',
+  'analysis.hodoscope.map.hideCategory': 'Hide {category}',
+  'analysis.hodoscope.map.showCategory': 'Show {category}',
+  'analysis.hodoscope.map.updating': 'Updating map…',
+  'analysis.hodoscope.map.visibleCount': '{visible} / {total} visible',
+  'analysis.hodoscope.map.ariaLabel':
+    '{method} embedding with {count} visible actions. Use arrow keys to inspect points, Enter to open a selected run, and 0 to fit the map.',
+  'analysis.hodoscope.map.selectedAction':
+    'Action {index} of {count}: {summary}',
+  'analysis.hodoscope.map.hiddenSelectedAction':
+    'Selected action is hidden by the current filters: {summary}. {count} actions visible.',
+  'analysis.hodoscope.map.noActionSelected':
+    'No action selected. {count} actions visible.',
+  'analysis.hodoscope.path.coverageKnown':
+    '{projected} projected / {total} total',
+  'analysis.hodoscope.path.coverageUnknownTotal':
+    '{projected} projected · total unknown',
+  'analysis.hodoscope.path.completeNotice':
+    'Complete action coverage for this projected run.',
+  'analysis.hodoscope.path.sampledNotice':
+    'Sampled path. Dashed links can skip actions not in this projection.',
+  'analysis.hodoscope.path.unknownNotice':
+    'Coverage is unknown. Dashed links may skip unprojected actions.',
+  'analysis.hodoscope.path.a11yDescription':
+    'Selected run path shown with {coverage}.',
+  'analysis.hodoscope.inspector.title': 'Action inspector',
+  'analysis.hodoscope.inspector.subtitle':
+    'Selection stays put while you explore',
+  'analysis.hodoscope.inspector.previousPathAction':
+    'Select previous action in this run path',
+  'analysis.hodoscope.inspector.previousVisibleAction':
+    'Select previous visible action',
+  'analysis.hodoscope.inspector.nextPathAction':
+    'Select next action in this run path',
+  'analysis.hodoscope.inspector.nextVisibleAction':
+    'Select next visible action',
+  'analysis.hodoscope.inspector.task': 'Task',
+  'analysis.hodoscope.inspector.transcript': 'Transcript',
+  'analysis.hodoscope.inspector.transcriptAction':
+    '{transcript} · action {action}',
+  'analysis.hodoscope.inspector.exception': 'Exception',
+  'analysis.hodoscope.path.title': 'Run path',
+  'analysis.hodoscope.path.stepCount': 'Step {step} of {count}',
+  'analysis.hodoscope.path.notInOrderedPath':
+    'Selected action is not in the ordered path',
+  'analysis.hodoscope.path.complete': 'Complete',
+  'analysis.hodoscope.path.sampled': 'Sampled',
+  'analysis.hodoscope.path.coverageUnknown': 'Coverage unknown',
+  'analysis.hodoscope.path.hide': 'Hide path',
+  'analysis.hodoscope.path.show': 'Show path',
+  'analysis.hodoscope.openSourceRun': 'Open source run',
+  'analysis.hodoscope.representatives.title': 'Representative actions',
+  'analysis.hodoscope.representatives.fpsDiversity': 'FPS diversity sample',
+  'analysis.hodoscope.representatives.fpsRank': 'FPS {rank}',
+  'analysis.hodoscope.inspector.selectAction': 'Select an action',
+  'analysis.hodoscope.inspector.selectActionHelp':
+    'Click a point or use the arrow keys while the map is focused.',
+  'analysis.hodoscope.map.axesNote':
+    '{method} axes have no semantic units. Read local neighborhoods more strongly than global distance.',
+  'analysis.hodoscope.map.resize': 'Resize Hodoscope map and inspector',
+  'analysis.hodoscope.path.startMarker': 'S',
+  'analysis.hodoscope.path.endMarker': 'E',
+  'analysis.hodoscope.path.startEndMarker': 'S/E',
 
   'analysis.summary.notableMoments': 'Notable moments',
   'analysis.summary.noObservations': 'No observations',
@@ -59,6 +183,12 @@ export const analysisEn = {
   'analysis.viewer.showTranscriptHierarchy': 'Show transcript hierarchy',
   'analysis.viewer.previousBlock': 'Previous block',
   'analysis.viewer.nextBlock': 'Next block',
+  'analysis.viewer.showDetailsPanel': 'Show details panel',
+  'analysis.viewer.hideDetailsPanel': 'Hide details panel',
+  'analysis.viewer.resizeTranscriptDetails':
+    'Resize transcript and details panels',
+  'analysis.viewer.resizeTranscriptHierarchyContent':
+    'Resize transcript hierarchy and content panels',
   'analysis.viewer.agentRunNotFound': 'Agent run not found',
   'analysis.viewer.agentRunLoadFailed': 'Failed to load agent run',
   'analysis.viewer.agentRunNotFoundDescription':
@@ -144,12 +274,20 @@ export const analysisZhCN = {
   'analysis.hodoscope.noMapData': '暂无行为地图数据',
   'analysis.hodoscope.actionsAcrossGroups':
     '{actions} 个动作，分为 {groups} 组',
+  'analysis.hodoscope.tagsCount': '{count} 个标签',
   'analysis.hodoscope.stagePoints': '{stage} · {points} 个点',
   'analysis.hodoscope.groupBy': '分组依据',
   'analysis.hodoscope.autoDetectModel': '自动识别模型',
+  'analysis.hodoscope.tagBy': '标签字段',
+  'analysis.hodoscope.tagByAria': '将元数据字段添加为 Hodoscope 标签',
+  'analysis.hodoscope.tagByHelp': '在查看时添加元数据标签，无需重新运行分析',
+  'analysis.hodoscope.none': '无',
   'analysis.hodoscope.maxRuns': '最多运行数',
+  'analysis.hodoscope.maxPoints': '最多点数',
   'analysis.hodoscope.projection': '降维方法',
   'analysis.hodoscope.run': '运行',
+  'analysis.hodoscope.downloadJson': '下载 Hodoscope JSON 产物',
+  'analysis.hodoscope.progressLabel': '{name}：{status}',
   'analysis.hodoscope.empty':
     '运行 Hodoscope，为此集合生成动作摘要的行为地图。',
   'analysis.hodoscope.groups': '分组',
@@ -164,6 +302,109 @@ export const analysisZhCN = {
   'analysis.hodoscope.stage.complete': '已完成',
   'analysis.hodoscope.stage.error': '错误',
   'analysis.hodoscope.stage.canceled': '已取消',
+
+  'analysis.hodoscope.outcome.passed': '通过',
+  'analysis.hodoscope.outcome.failed': '失败',
+  'analysis.hodoscope.outcome.timeout': '超时',
+  'analysis.hodoscope.outcome.exception': '异常',
+  'analysis.hodoscope.outcome.unknown': '未知',
+  'analysis.hodoscope.tagSource.metadata': '元数据',
+  'analysis.hodoscope.tagSource.rubricCluster': '准则聚类',
+  'analysis.hodoscope.tagSource.pointRubric': '点级准则',
+  'analysis.hodoscope.tagSource.manual': '手动',
+  'analysis.hodoscope.tagScope.point': '点',
+  'analysis.hodoscope.tagScope.runInherited': '运行 · 继承',
+  'analysis.hodoscope.search.placeholder': '搜索动作、标签、任务或错误',
+  'analysis.hodoscope.search.aria': '搜索嵌入点',
+  'analysis.hodoscope.colorBy': '嵌入点着色依据',
+  'analysis.hodoscope.color.outcome': '结果',
+  'analysis.hodoscope.color.group': '分组',
+  'analysis.hodoscope.tags.filterButton': '按标签筛选',
+  'analysis.hodoscope.tags.filterButtonActive': '按标签筛选，已启用 {count} 个',
+  'analysis.hodoscope.tags.label': '标签',
+  'analysis.hodoscope.tags.filterTitle': '按标签筛选',
+  'analysis.hodoscope.tags.filterLogic': '同一类别内取“或” · 不同类别间取“且”',
+  'analysis.hodoscope.tags.clear': '清除',
+  'analysis.hodoscope.tags.searchPlaceholder': '搜索标签名称或来源',
+  'analysis.hodoscope.tags.searchAria': '搜索可用的 Hodoscope 标签',
+  'analysis.hodoscope.tags.filterBy': '按{source}筛选：{label}',
+  'analysis.hodoscope.tags.resultLimit':
+    '正在显示前 {limit} 个标签（共 {count} 个）。请搜索以缩小范围。',
+  'analysis.hodoscope.tags.noMatches': '没有匹配此搜索的标签。',
+  'analysis.hodoscope.tags.activeFilters': '标签筛选条件',
+  'analysis.hodoscope.tags.removeFilter': '移除标签筛选条件 {source}：{label}',
+  'analysis.hodoscope.tags.sourceAndLabel': '{source}：{label}',
+  'analysis.hodoscope.tags.clearAll': '全部清除',
+  'analysis.hodoscope.tags.actionTags': '动作标签',
+  'analysis.hodoscope.tags.attachedCount': '已附加 {count} 个',
+  'analysis.hodoscope.tags.pointTags': '点标签',
+  'analysis.hodoscope.tags.runTagsInherited': '运行标签 · 继承',
+  'analysis.hodoscope.tags.noneAttached': '此动作没有附加标签。',
+  'analysis.hodoscope.path.toolbarLabel': '路径',
+  'analysis.hodoscope.path.hideSelected': '隐藏所选运行路径',
+  'analysis.hodoscope.path.showSelected': '显示所选运行路径',
+  'analysis.hodoscope.path.selectActionWithData': '请选择含路径数据的动作',
+  'analysis.hodoscope.map.zoomOut': '缩小',
+  'analysis.hodoscope.map.zoomIn': '放大',
+  'analysis.hodoscope.map.fit': '适应',
+  'analysis.hodoscope.map.fitEmbedding': '使嵌入图适应视图',
+  'analysis.hodoscope.map.panZoomHelp': '拖动以平移 · 滚轮或按钮以缩放',
+  'analysis.hodoscope.map.hideCategory': '隐藏 {category}',
+  'analysis.hodoscope.map.showCategory': '显示 {category}',
+  'analysis.hodoscope.map.updating': '正在更新地图…',
+  'analysis.hodoscope.map.visibleCount': '显示 {visible} / {total} 个',
+  'analysis.hodoscope.map.ariaLabel':
+    '{method} 嵌入图，当前显示 {count} 个动作。使用方向键查看各点，按 Enter 打开所选运行，按 0 使地图适应视图。',
+  'analysis.hodoscope.map.selectedAction':
+    '第 {index} 个动作（共 {count} 个）：{summary}',
+  'analysis.hodoscope.map.hiddenSelectedAction':
+    '所选动作已被当前筛选条件隐藏：{summary}。当前显示 {count} 个动作。',
+  'analysis.hodoscope.map.noActionSelected':
+    '未选择动作。当前显示 {count} 个动作。',
+  'analysis.hodoscope.path.coverageKnown':
+    '已投影 {projected} 个 / 共 {total} 个',
+  'analysis.hodoscope.path.coverageUnknownTotal':
+    '已投影 {projected} 个 · 总数未知',
+  'analysis.hodoscope.path.completeNotice': '此已投影运行包含完整的动作覆盖。',
+  'analysis.hodoscope.path.sampledNotice':
+    '这是抽样路径。虚线连接可能跳过未包含在此投影中的动作。',
+  'analysis.hodoscope.path.unknownNotice':
+    '覆盖范围未知。虚线连接可能跳过未投影的动作。',
+  'analysis.hodoscope.path.a11yDescription':
+    '已显示所选运行路径，覆盖情况：{coverage}。',
+  'analysis.hodoscope.inspector.title': '动作检查器',
+  'analysis.hodoscope.inspector.subtitle': '浏览时保持当前选择',
+  'analysis.hodoscope.inspector.previousPathAction':
+    '选择此运行路径中的上一个动作',
+  'analysis.hodoscope.inspector.previousVisibleAction': '选择上一个可见动作',
+  'analysis.hodoscope.inspector.nextPathAction': '选择此运行路径中的下一个动作',
+  'analysis.hodoscope.inspector.nextVisibleAction': '选择下一个可见动作',
+  'analysis.hodoscope.inspector.task': '任务',
+  'analysis.hodoscope.inspector.transcript': '对话记录',
+  'analysis.hodoscope.inspector.transcriptAction':
+    '第 {transcript} 份 · 第 {action} 个动作',
+  'analysis.hodoscope.inspector.exception': '异常',
+  'analysis.hodoscope.path.title': '运行路径',
+  'analysis.hodoscope.path.stepCount': '第 {step} 步，共 {count} 步',
+  'analysis.hodoscope.path.notInOrderedPath': '所选动作不在有序路径中',
+  'analysis.hodoscope.path.complete': '完整',
+  'analysis.hodoscope.path.sampled': '已抽样',
+  'analysis.hodoscope.path.coverageUnknown': '覆盖范围未知',
+  'analysis.hodoscope.path.hide': '隐藏路径',
+  'analysis.hodoscope.path.show': '显示路径',
+  'analysis.hodoscope.openSourceRun': '打开源运行',
+  'analysis.hodoscope.representatives.title': '代表动作',
+  'analysis.hodoscope.representatives.fpsDiversity': 'FPS 多样性样本',
+  'analysis.hodoscope.representatives.fpsRank': 'FPS {rank}',
+  'analysis.hodoscope.inspector.selectAction': '选择动作',
+  'analysis.hodoscope.inspector.selectActionHelp':
+    '单击一个点，或将焦点置于地图后使用方向键。',
+  'analysis.hodoscope.map.axesNote':
+    '{method} 坐标轴没有语义单位。局部邻域比全局距离更具参考价值。',
+  'analysis.hodoscope.map.resize': '调整 Hodoscope 地图和检查器的大小',
+  'analysis.hodoscope.path.startMarker': '起',
+  'analysis.hodoscope.path.endMarker': '终',
+  'analysis.hodoscope.path.startEndMarker': '起/终',
 
   'analysis.summary.notableMoments': '值得关注的时刻',
   'analysis.summary.noObservations': '无观察结果',
@@ -194,6 +435,11 @@ export const analysisZhCN = {
   'analysis.viewer.showTranscriptHierarchy': '显示对话记录层级',
   'analysis.viewer.previousBlock': '上一个区块',
   'analysis.viewer.nextBlock': '下一个区块',
+  'analysis.viewer.showDetailsPanel': '显示详情面板',
+  'analysis.viewer.hideDetailsPanel': '隐藏详情面板',
+  'analysis.viewer.resizeTranscriptDetails': '调整对话记录和详情面板的大小',
+  'analysis.viewer.resizeTranscriptHierarchyContent':
+    '调整对话记录层级和内容面板的大小',
   'analysis.viewer.agentRunNotFound': '未找到智能体运行',
   'analysis.viewer.agentRunLoadFailed': '无法加载智能体运行',
   'analysis.viewer.agentRunNotFoundDescription':

@@ -18,6 +18,9 @@ export const miscEn = {
   'misc.rubric.analyze': 'Analyze',
   'misc.rubric.label': 'Label',
   'misc.rubric.openResultToEditLabels': 'Open a result to edit labels.',
+  'misc.rubric.resizeDefinitionPanel': 'Resize rubric definition panel',
+  'misc.rubric.resizeResultAssistantPanels':
+    'Resize rubric result and assistant panels',
   'misc.rubric.share': 'Share rubric',
   'misc.rubric.linkCopied': 'Link copied',
   'misc.rubric.linkCopiedDescription': 'Rubric link copied to clipboard',
@@ -71,6 +74,8 @@ export const miscZhCN = {
   'misc.rubric.analyze': '分析',
   'misc.rubric.label': '标注',
   'misc.rubric.openResultToEditLabels': '打开一条结果以编辑标签。',
+  'misc.rubric.resizeDefinitionPanel': '调整评估准则定义面板大小',
+  'misc.rubric.resizeResultAssistantPanels': '调整评估准则结果与助手面板大小',
   'misc.rubric.share': '分享评估准则',
   'misc.rubric.linkCopied': '链接已复制',
   'misc.rubric.linkCopiedDescription': '评估准则链接已复制到剪贴板',

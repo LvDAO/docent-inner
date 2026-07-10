@@ -289,13 +289,13 @@ def test_chart_judge_subqueries_are_scoped_to_response_locale():
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_hodoscope_analysis_list_is_scoped_to_user_locale():
-    class EmptyScalarResult:
+    class EmptyMappingResult:
         def all(self) -> list[Any]:
             return []
 
     class EmptyResult:
-        def scalars(self) -> EmptyScalarResult:
-            return EmptyScalarResult()
+        def mappings(self) -> EmptyMappingResult:
+            return EmptyMappingResult()
 
     class CapturingSession:
         statement: Select[Any] | None = None
