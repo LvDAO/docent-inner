@@ -7,6 +7,7 @@ import * as SliderPrimitive from '@radix-ui/react-slider';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useDebounce } from '@/hooks/use-debounce';
+import { useLocale } from '../contexts/LocaleContext';
 
 interface StepFilterProps {
   metadataData: Record<string, Record<string, unknown>>;
@@ -21,6 +22,7 @@ export const StepFilter: React.FC<StepFilterProps> = ({
   currentValue = null,
   disabled = false,
 }) => {
+  const { t } = useLocale();
   const [stepValue, setStepValue] = useState<number | null>(null);
   const [inputValue, setInputValue] = useState<string>('');
   const previousDebouncedValue = useRef<number | null>(null);
@@ -129,7 +131,7 @@ export const StepFilter: React.FC<StepFilterProps> = ({
       {/* Slider and Text input in a row */}
       <div className="flex items-center gap-2">
         <div className="text-xs text-muted-foreground font-mono min-w-0">
-          Step:
+          {t('charts.filter.step')}:
         </div>
         <div className="flex-1 pt-5">
           <div className="relative">
@@ -185,6 +187,8 @@ export const StepFilter: React.FC<StepFilterProps> = ({
               size="sm"
               onClick={handleClear}
               className="h-5 w-5 p-0 text-muted-foreground hover:text-primary"
+              title={t('charts.filter.clear')}
+              aria-label={t('charts.filter.clear')}
             >
               <X className="h-3 w-3" />
             </Button>

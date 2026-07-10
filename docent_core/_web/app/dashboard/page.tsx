@@ -36,10 +36,12 @@ import {
   useCreateCollectionMutation,
   useGetCollectionsQuery,
 } from '../api/collectionApi';
+import { useLocale } from '../contexts/LocaleContext';
 
 export default function HomePage() {
   // User is guaranteed to be present in authenticated pages
   const { user } = useRequireUserContext();
+  const { t } = useLocale();
 
   const dispatch = useAppDispatch();
 
@@ -78,14 +80,14 @@ export default function HomePage() {
       setNewCollectionDescription('');
 
       toast({
-        title: 'Collection Created',
-        description: 'New collection has been created successfully',
+        title: t('dashboard.collectionCreated'),
+        description: t('dashboard.collectionCreatedDescription'),
       });
     } catch (error) {
       console.error('Failed to create collection:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to create new collection',
+        title: t('common.error'),
+        description: t('dashboard.collectionCreateFailed'),
         variant: 'destructive',
       });
     }
@@ -99,13 +101,13 @@ export default function HomePage() {
           <div className="flex justify-between items-center">
             <div>
               <div className="text-lg font-semibold tracking-tight">
-                Docent Dashboard
+                {t('dashboard.title')}
               </div>
               <div className="text-xs text-muted-foreground">
-                Welcome {user.email}!{' '}
+                {t('dashboard.welcome', { email: user.email })}{' '}
                 {user.is_anonymous
-                  ? 'Make an account to create new Collections.'
-                  : 'Create a new Collection for each benchmark or set of experiments.'}
+                  ? t('dashboard.anonymousDescription')
+                  : t('dashboard.userDescription')}
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -119,12 +121,12 @@ export default function HomePage() {
                       disabled={user.is_anonymous}
                     >
                       <PlusIcon className="h-3.5 w-3.5" />
-                      Create New Collection
+                      {t('dashboard.createCollection')}
                     </Button>
                   </TooltipTrigger>
                   {user.is_anonymous && (
                     <TooltipContent>
-                      <p>Create an account to create collections</p>
+                      <p>{t('dashboard.createAccountHint')}</p>
                     </TooltipContent>
                   )}
                 </Tooltip>
@@ -143,10 +145,10 @@ export default function HomePage() {
             <BookOpenIcon className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
             <div className="flex-1">
               <h3 className="font-medium text-sm mb-1 text-primary">
-                Get Started with Docent
+                {t('dashboard.getStarted')}
               </h3>
               <p className="text-xs text-muted-foreground mb-3">
-                Learn how to ingest your data and get started with analysis!
+                {t('dashboard.getStartedDescription')}
               </p>
               <Button variant="outline" size="sm" asChild>
                 <a
@@ -154,7 +156,7 @@ export default function HomePage() {
                   target="_blank"
                   className="inline-flex items-center gap-1"
                 >
-                  Read the quickstart guide
+                  {t('dashboard.readQuickstart')}
                 </a>
               </Button>
               <Button variant="outline" size="sm" asChild>
@@ -163,7 +165,7 @@ export default function HomePage() {
                   target="_blank"
                   className="inline-flex items-center gap-1 ml-1"
                 >
-                  Check out a sample collection
+                  {t('dashboard.sampleCollection')}
                 </a>
               </Button>
             </div>
@@ -184,28 +186,28 @@ export default function HomePage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create New Collection</DialogTitle>
+            <DialogTitle>{t('dashboard.createDialogTitle')}</DialogTitle>
             <DialogDescription>
-              Create a new collection for your benchmark or experiment set.
+              {t('dashboard.createDialogDescription')}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="new-name">Name</Label>
+              <Label htmlFor="new-name">{t('common.name')}</Label>
               <Input
                 id="new-name"
                 value={newCollectionName}
                 onChange={(e) => setNewCollectionName(e.target.value)}
-                placeholder="Enter a name for this collection"
+                placeholder={t('dashboard.collectionNamePlaceholder')}
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="new-description">Description</Label>
+              <Label htmlFor="new-description">{t('common.description')}</Label>
               <Textarea
                 id="new-description"
                 value={newCollectionDescription}
                 onChange={(e) => setNewCollectionDescription(e.target.value)}
-                placeholder="Enter a description for this collection"
+                placeholder={t('dashboard.collectionDescriptionPlaceholder')}
                 rows={3}
               />
             </div>
@@ -216,13 +218,15 @@ export default function HomePage() {
               onClick={() => setIsNewCollectionDialogOpen(false)}
               disabled={isCreatingCollection}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               onClick={handleCreateCollection}
               disabled={isCreatingCollection}
             >
-              {isCreatingCollection ? 'Creating...' : 'Create Collection'}
+              {isCreatingCollection
+                ? t('dashboard.creating')
+                : t('dashboard.create')}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1,4 +1,7 @@
+'use client';
+
 import { HodoscopeTrajectoryPath } from '../api/hodoscopeApi';
+import { useLocale } from '../contexts/LocaleContext';
 
 interface PointPosition {
   x: number;
@@ -50,6 +53,7 @@ export function HodoscopeTrajectoryLayer({
   positions,
   scale,
 }: HodoscopeTrajectoryLayerProps) {
+  const { t } = useLocale();
   const orderedPositions = path.point_ids
     .map((pointId) => positions.get(pointId))
     .filter((position): position is PointPosition => Boolean(position));
@@ -120,7 +124,9 @@ export function HodoscopeTrajectoryLayer({
           fontWeight={700}
           textAnchor="middle"
         >
-          {orderedPositions.length === 1 ? 'S/E' : 'S'}
+          {orderedPositions.length === 1
+            ? t('analysis.hodoscope.path.startEndMarker')
+            : t('analysis.hodoscope.path.startMarker')}
         </text>
       </g>
 
@@ -139,7 +145,7 @@ export function HodoscopeTrajectoryLayer({
             fontWeight={700}
             textAnchor="middle"
           >
-            E
+            {t('analysis.hodoscope.path.endMarker')}
           </text>
         </g>
       ) : null}

@@ -44,6 +44,7 @@ import {
   HodoscopeProjectionPoint,
   HodoscopeTagCatalogEntry,
 } from '../api/hodoscopeApi';
+import { useLocale } from '../contexts/LocaleContext';
 import { HodoscopeTrajectoryLayer } from './HodoscopeTrajectoryLayer';
 import {
   buildTagLookup,
@@ -52,6 +53,7 @@ import {
   getTagScopeLabel,
   getTagSourceLabel,
   groupTagCatalog,
+  type HodoscopeTagLabels,
   matchesHodoscopeSearch,
   matchesPointTagFilters,
 } from './hodoscopeViewModel';
@@ -105,14 +107,6 @@ const OUTCOME_ORDER: Outcome[] = [
   'exception',
   'unknown',
 ];
-
-const OUTCOME_LABELS: Record<Outcome, string> = {
-  passed: 'Passed',
-  failed: 'Failed',
-  timeout: 'Timeout',
-  exception: 'Exception',
-  unknown: 'Unknown',
-};
 
 const OUTCOME_COLORS: Record<Outcome, string> = {
   passed: 'hsl(var(--green-text))',
@@ -363,6 +357,7 @@ export function HodoscopeEmbeddingMap({
   onOpenPoint,
   layoutStorageKey,
 }: HodoscopeEmbeddingMapProps) {
+  const { t } = useLocale();
   const shellRef = useRef<HTMLDivElement>(null);
   const plotRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -410,11 +405,34 @@ export function HodoscopeEmbeddingMap({
     () => projection.tag_catalog ?? [],
     [projection.tag_catalog]
   );
+  const tagLabels = useMemo<HodoscopeTagLabels>(
+    () => ({
+      sources: {
+        metadata: t('analysis.hodoscope.tagSource.metadata'),
+        rubric_cluster: t('analysis.hodoscope.tagSource.rubricCluster'),
+        point_rubric: t('analysis.hodoscope.tagSource.pointRubric'),
+        manual: t('analysis.hodoscope.tagSource.manual'),
+      },
+      pointScope: t('analysis.hodoscope.tagScope.point'),
+      runInheritedScope: t('analysis.hodoscope.tagScope.runInherited'),
+    }),
+    [t]
+  );
+  const outcomeLabels = useMemo<Record<Outcome, string>>(
+    () => ({
+      passed: t('analysis.hodoscope.outcome.passed'),
+      failed: t('analysis.hodoscope.outcome.failed'),
+      timeout: t('analysis.hodoscope.outcome.timeout'),
+      exception: t('analysis.hodoscope.outcome.exception'),
+      unknown: t('analysis.hodoscope.outcome.unknown'),
+    }),
+    [t]
+  );
   const tagById = useMemo(() => buildTagLookup(tagCatalog), [tagCatalog]);
   const normalizedTagQuery = tagQuery.trim().toLowerCase();
   const tagFacetGroups = useMemo(
-    () => groupTagCatalog(tagCatalog, normalizedTagQuery),
-    [normalizedTagQuery, tagCatalog]
+    () => groupTagCatalog(tagCatalog, normalizedTagQuery, tagLabels),
+    [normalizedTagQuery, tagCatalog, tagLabels]
   );
   const matchingTagCount = useMemo(
     () => tagFacetGroups.reduce((count, group) => count + group.tags.length, 0),
@@ -466,11 +484,17 @@ export function HodoscopeEmbeddingMap({
       (outcome) => (counts.get(outcome) ?? 0) > 0
     ).map((outcome) => ({
       key: outcome,
-      label: OUTCOME_LABELS[outcome],
+      label: outcomeLabels[outcome],
       count: counts.get(outcome) ?? 0,
       color: OUTCOME_COLORS[outcome],
     }));
-  }, [colorMode, groupNames, projection.groups, projection.points]);
+  }, [
+    colorMode,
+    groupNames,
+    outcomeLabels,
+    projection.groups,
+    projection.points,
+  ]);
 
   const deferredQuery = useDeferredValue(query);
   const normalizedQuery = deferredQuery.trim().toLowerCase();
@@ -481,7 +505,7 @@ export function HodoscopeEmbeddingMap({
         (point) =>
           !hiddenCategories.has(pointCategory(point, colorMode)) &&
           matchesPointTagFilters(point, selectedTagIds, tagById) &&
-          matchesHodoscopeSearch(point, normalizedQuery, tagById)
+          matchesHodoscopeSearch(point, normalizedQuery, tagById, tagLabels)
       ),
     [
       colorMode,
@@ -490,6 +514,7 @@ export function HodoscopeEmbeddingMap({
       projection.points,
       selectedTagIds,
       tagById,
+      tagLabels,
     ]
   );
 
@@ -882,23 +907,28 @@ export function HodoscopeEmbeddingMap({
   );
 
   const selectedPathCoverage = selectedTrajectoryPath
-    ? `${selectedTrajectoryPath.projected_point_count} projected${
-        selectedTrajectoryPath.total_action_count === null
-          ? ' · total unknown'
-          : ` / ${selectedTrajectoryPath.total_action_count} total`
-      }`
+    ? selectedTrajectoryPath.total_action_count === null
+      ? t('analysis.hodoscope.path.coverageUnknownTotal', {
+          projected: selectedTrajectoryPath.projected_point_count,
+        })
+      : t('analysis.hodoscope.path.coverageKnown', {
+          projected: selectedTrajectoryPath.projected_point_count,
+          total: selectedTrajectoryPath.total_action_count,
+        })
     : null;
   const selectedPathNotice = selectedTrajectoryPath
     ? selectedTrajectoryPath.complete === true
-      ? 'Complete action coverage for this projected run.'
+      ? t('analysis.hodoscope.path.completeNotice')
       : selectedTrajectoryPath.complete === false
-        ? 'Sampled path. Dashed links can skip actions not in this projection.'
-        : 'Coverage is unknown. Dashed links may skip unprojected actions.'
+        ? t('analysis.hodoscope.path.sampledNotice')
+        : t('analysis.hodoscope.path.unknownNotice')
     : null;
   const selectedPathA11yDescription =
-    showSelectedPath && selectedTrajectoryPath
-      ? ` Selected run path shown with ${selectedPathCoverage}.`
-      : '';
+    showSelectedPath && selectedTrajectoryPath && selectedPathCoverage
+      ? t('analysis.hodoscope.path.a11yDescription', {
+          coverage: selectedPathCoverage,
+        })
+      : null;
 
   const mapPanel = (
     <div className="flex h-full min-h-0 flex-col bg-background">
@@ -919,8 +949,8 @@ export function HodoscopeEmbeddingMap({
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search actions, tags, tasks, or errors"
-            aria-label="Search embedding points"
+            placeholder={t('analysis.hodoscope.search.placeholder')}
+            aria-label={t('analysis.hodoscope.search.aria')}
             className="h-8 border-border/70 bg-muted/30 pl-8 text-xs"
           />
         </div>
@@ -928,7 +958,7 @@ export function HodoscopeEmbeddingMap({
         <div
           className="flex rounded-md border border-border/70 bg-muted/30 p-0.5"
           role="group"
-          aria-label="Color embedding by"
+          aria-label={t('analysis.hodoscope.colorBy')}
         >
           <Button
             type="button"
@@ -941,7 +971,7 @@ export function HodoscopeEmbeddingMap({
             aria-pressed={colorMode === 'outcome'}
             onClick={() => selectColorMode('outcome')}
           >
-            Outcome
+            {t('analysis.hodoscope.color.outcome')}
           </Button>
           <Button
             type="button"
@@ -954,7 +984,7 @@ export function HodoscopeEmbeddingMap({
             aria-pressed={colorMode === 'group'}
             onClick={() => selectColorMode('group')}
           >
-            Group
+            {t('analysis.hodoscope.color.group')}
           </Button>
         </div>
 
@@ -965,11 +995,19 @@ export function HodoscopeEmbeddingMap({
               size="sm"
               variant="outline"
               className="h-8 shrink-0 gap-1.5 px-2.5 text-xs"
-              aria-label={`Filter by tags${selectedTagIds.size ? `, ${selectedTagIds.size} active` : ''}`}
+              aria-label={
+                selectedTagIds.size
+                  ? t('analysis.hodoscope.tags.filterButtonActive', {
+                      count: selectedTagIds.size,
+                    })
+                  : t('analysis.hodoscope.tags.filterButton')
+              }
               disabled={tagCatalog.length === 0}
             >
               <Tag className="h-3.5 w-3.5" />
-              <span className={cn(!isWide && 'sr-only')}>Tags</span>
+              <span className={cn(!isWide && 'sr-only')}>
+                {t('analysis.hodoscope.tags.label')}
+              </span>
               {selectedTagIds.size > 0 ? (
                 <span className="rounded-full bg-blue-bg px-1.5 text-[10px] font-semibold text-blue-text">
                   {selectedTagIds.size}
@@ -981,9 +1019,11 @@ export function HodoscopeEmbeddingMap({
             <div className="border-b border-border/70 p-3">
               <div className="mb-2 flex items-center justify-between gap-2">
                 <div>
-                  <div className="text-xs font-semibold">Filter by tags</div>
+                  <div className="text-xs font-semibold">
+                    {t('analysis.hodoscope.tags.filterTitle')}
+                  </div>
                   <div className="text-[10px] text-muted-foreground">
-                    OR within a facet · AND across facets
+                    {t('analysis.hodoscope.tags.filterLogic')}
                   </div>
                 </div>
                 {selectedTagIds.size > 0 ? (
@@ -994,7 +1034,7 @@ export function HodoscopeEmbeddingMap({
                     className="h-7 px-2 text-[11px]"
                     onClick={clearTagFilters}
                   >
-                    Clear
+                    {t('analysis.hodoscope.tags.clear')}
                   </Button>
                 ) : null}
               </div>
@@ -1004,8 +1044,8 @@ export function HodoscopeEmbeddingMap({
                   type="search"
                   value={tagQuery}
                   onChange={(event) => setTagQuery(event.target.value)}
-                  placeholder="Search tag labels or sources"
-                  aria-label="Search available Hodoscope tags"
+                  placeholder={t('analysis.hodoscope.tags.searchPlaceholder')}
+                  aria-label={t('analysis.hodoscope.tags.searchAria')}
                   className="h-8 pl-8 text-xs"
                 />
               </div>
@@ -1016,22 +1056,28 @@ export function HodoscopeEmbeddingMap({
                   {visibleTagFacetGroups.map((group) => (
                     <section
                       key={group.facet}
-                      aria-label={getTagSourceLabel(group.tags[0])}
+                      aria-label={getTagSourceLabel(group.tags[0], tagLabels)}
                     >
                       <div className="mb-1 px-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                        {getTagSourceLabel(group.tags[0])}
+                        {getTagSourceLabel(group.tags[0], tagLabels)}
                       </div>
                       <div className="space-y-0.5">
                         {group.tags.map((tag) => (
                           <label
                             key={tag.id}
                             className="flex cursor-pointer items-start gap-2 rounded-md px-1.5 py-1.5 hover:bg-muted/60"
-                            title={`${getTagScopeLabel(tag)} · ${getTagSourceLabel(tag)}`}
+                            title={`${getTagScopeLabel(tag, tagLabels)} · ${getTagSourceLabel(tag, tagLabels)}`}
                           >
                             <Checkbox
                               checked={selectedTagIds.has(tag.id)}
                               onCheckedChange={() => toggleTagFilter(tag.id)}
-                              aria-label={`Filter by ${getTagSourceLabel(tag)}: ${getTagDisplayLabel(tag)}`}
+                              aria-label={t(
+                                'analysis.hodoscope.tags.filterBy',
+                                {
+                                  source: getTagSourceLabel(tag, tagLabels),
+                                  label: getTagDisplayLabel(tag),
+                                }
+                              )}
                               className="mt-0.5"
                             />
                             <span className="min-w-0 flex-1">
@@ -1039,8 +1085,8 @@ export function HodoscopeEmbeddingMap({
                                 {getTagDisplayLabel(tag)}
                               </span>
                               <span className="block truncate text-[10px] text-muted-foreground">
-                                {getTagScopeLabel(tag)} ·{' '}
-                                {getTagSourceLabel(tag)}
+                                {getTagScopeLabel(tag, tagLabels)} ·{' '}
+                                {getTagSourceLabel(tag, tagLabels)}
                               </span>
                             </span>
                             <span className="text-[10px] tabular-nums text-muted-foreground">
@@ -1053,14 +1099,16 @@ export function HodoscopeEmbeddingMap({
                   ))}
                   {matchingTagCount > MAX_TAG_POPOVER_RESULTS ? (
                     <p className="px-1 text-[10px] leading-relaxed text-muted-foreground">
-                      Showing the first {MAX_TAG_POPOVER_RESULTS} of{' '}
-                      {matchingTagCount} tags. Search to narrow the list.
+                      {t('analysis.hodoscope.tags.resultLimit', {
+                        limit: MAX_TAG_POPOVER_RESULTS,
+                        count: matchingTagCount,
+                      })}
                     </p>
                   ) : null}
                 </div>
               ) : (
                 <div className="px-3 py-8 text-center text-xs text-muted-foreground">
-                  No tags match this search.
+                  {t('analysis.hodoscope.tags.noMatches')}
                 </div>
               )}
             </div>
@@ -1072,18 +1120,26 @@ export function HodoscopeEmbeddingMap({
           size="sm"
           variant={showSelectedPath ? 'secondary' : 'outline'}
           className="h-8 shrink-0 gap-1.5 px-2.5 text-xs"
-          aria-label={`${showSelectedPath ? 'Hide' : 'Show'} selected run path`}
+          aria-label={
+            showSelectedPath
+              ? t('analysis.hodoscope.path.hideSelected')
+              : t('analysis.hodoscope.path.showSelected')
+          }
           aria-pressed={showSelectedPath}
           disabled={!selectedTrajectoryPath}
           title={
             selectedTrajectoryPath
-              ? `${showSelectedPath ? 'Hide' : 'Show'} selected run path`
-              : 'Select an action with path data'
+              ? showSelectedPath
+                ? t('analysis.hodoscope.path.hideSelected')
+                : t('analysis.hodoscope.path.showSelected')
+              : t('analysis.hodoscope.path.selectActionWithData')
           }
           onClick={() => setShowSelectedPath((current) => !current)}
         >
           <Route className="h-3.5 w-3.5" />
-          <span className={cn(!isWide && 'sr-only')}>Path</span>
+          <span className={cn(!isWide && 'sr-only')}>
+            {t('analysis.hodoscope.path.toolbarLabel')}
+          </span>
         </Button>
 
         {isWide ? (
@@ -1094,7 +1150,7 @@ export function HodoscopeEmbeddingMap({
                 size="icon"
                 variant="ghost"
                 className="h-7 w-7 rounded-r-none"
-                aria-label="Zoom out"
+                aria-label={t('analysis.hodoscope.map.zoomOut')}
                 onClick={() => zoomAt(view.scale / 1.35)}
                 disabled={view.scale <= MIN_ZOOM}
               >
@@ -1108,7 +1164,7 @@ export function HodoscopeEmbeddingMap({
                 size="icon"
                 variant="ghost"
                 className="h-7 w-7 rounded-l-none"
-                aria-label="Zoom in"
+                aria-label={t('analysis.hodoscope.map.zoomIn')}
                 onClick={() => zoomAt(view.scale * 1.35)}
                 disabled={view.scale >= MAX_ZOOM}
               >
@@ -1123,7 +1179,7 @@ export function HodoscopeEmbeddingMap({
               onClick={resetView}
             >
               <Focus className="h-3.5 w-3.5" />
-              Fit
+              {t('analysis.hodoscope.map.fit')}
             </Button>
           </>
         ) : null}
@@ -1132,19 +1188,25 @@ export function HodoscopeEmbeddingMap({
       {selectedTags.length > 0 ? (
         <div className="flex min-h-9 items-center gap-1.5 overflow-x-auto border-b border-border/60 bg-blue-bg/20 px-3 py-1.5">
           <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Tag filters
+            {t('analysis.hodoscope.tags.activeFilters')}
           </span>
           {selectedTags.map((tag) => (
             <button
               key={tag.id}
               type="button"
               className="inline-flex h-6 max-w-56 shrink-0 items-center gap-1 rounded-full border border-blue-border bg-background px-2 text-[10px] text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              aria-label={`Remove tag filter ${getTagSourceLabel(tag)}: ${getTagDisplayLabel(tag)}`}
-              title={`${getTagScopeLabel(tag)} · ${getTagSourceLabel(tag)}`}
+              aria-label={t('analysis.hodoscope.tags.removeFilter', {
+                source: getTagSourceLabel(tag, tagLabels),
+                label: getTagDisplayLabel(tag),
+              })}
+              title={`${getTagScopeLabel(tag, tagLabels)} · ${getTagSourceLabel(tag, tagLabels)}`}
               onClick={() => toggleTagFilter(tag.id)}
             >
               <span className="truncate">
-                {getTagSourceLabel(tag)}: {getTagDisplayLabel(tag)}
+                {t('analysis.hodoscope.tags.sourceAndLabel', {
+                  source: getTagSourceLabel(tag, tagLabels),
+                  label: getTagDisplayLabel(tag),
+                })}
               </span>
               <X className="h-3 w-3 shrink-0" aria-hidden="true" />
             </button>
@@ -1156,7 +1218,7 @@ export function HodoscopeEmbeddingMap({
             className="h-6 shrink-0 px-2 text-[10px]"
             onClick={clearTagFilters}
           >
-            Clear all
+            {t('analysis.hodoscope.tags.clearAll')}
           </Button>
         </div>
       ) : null}
@@ -1181,7 +1243,12 @@ export function HodoscopeEmbeddingMap({
                   : 'border-transparent bg-muted/40 text-muted-foreground opacity-55'
               )}
               onClick={() => toggleCategory(category.key)}
-              title={`${isVisible ? 'Hide' : 'Show'} ${category.label}`}
+              title={t(
+                isVisible
+                  ? 'analysis.hodoscope.map.hideCategory'
+                  : 'analysis.hodoscope.map.showCategory',
+                { category: category.label }
+              )}
             >
               <span
                 className="h-2 w-2 shrink-0 rounded-full"
@@ -1196,8 +1263,11 @@ export function HodoscopeEmbeddingMap({
         })}
         <span className="ml-auto shrink-0 text-[11px] tabular-nums text-muted-foreground">
           {searchIsPending
-            ? 'Updating map…'
-            : `${visiblePoints.length} / ${projection.points.length} visible`}
+            ? t('analysis.hodoscope.map.updating')
+            : t('analysis.hodoscope.map.visibleCount', {
+                visible: visiblePoints.length,
+                total: projection.points.length,
+              })}
         </span>
       </div>
 
@@ -1214,7 +1284,15 @@ export function HodoscopeEmbeddingMap({
           )}
           role="img"
           tabIndex={0}
-          aria-label={`${projection.projection_method.toUpperCase()} embedding with ${visiblePoints.length} visible actions.${selectedPathA11yDescription} Use arrow keys to inspect points, Enter to open a selected run, and 0 to fit the map.`}
+          aria-label={[
+            t('analysis.hodoscope.map.ariaLabel', {
+              method: projection.projection_method.toUpperCase(),
+              count: visiblePoints.length,
+            }),
+            selectedPathA11yDescription,
+          ]
+            .filter(Boolean)
+            .join(' ')}
           aria-describedby={`${svgId}-selection-status`}
           viewBox={`0 0 ${viewport.width} ${viewport.height}`}
           preserveAspectRatio="xMidYMid meet"
@@ -1283,13 +1361,25 @@ export function HodoscopeEmbeddingMap({
           aria-live="polite"
           aria-atomic="true"
         >
-          {`${
+          {[
             selectedPoint
               ? selectedVisibleIndex >= 0
-                ? `Action ${selectedVisibleIndex + 1} of ${visiblePoints.length}: ${selectedPoint.summary}`
-                : `Selected action is hidden by the current filters: ${selectedPoint.summary}. ${visiblePoints.length} actions visible.`
-              : `No action selected. ${visiblePoints.length} actions visible.`
-          }${selectedPathA11yDescription}`}
+                ? t('analysis.hodoscope.map.selectedAction', {
+                    index: selectedVisibleIndex + 1,
+                    count: visiblePoints.length,
+                    summary: selectedPoint.summary,
+                  })
+                : t('analysis.hodoscope.map.hiddenSelectedAction', {
+                    summary: selectedPoint.summary,
+                    count: visiblePoints.length,
+                  })
+              : t('analysis.hodoscope.map.noActionSelected', {
+                  count: visiblePoints.length,
+                }),
+            selectedPathA11yDescription,
+          ]
+            .filter(Boolean)
+            .join(' ')}
         </div>
 
         {!isWide ? (
@@ -1299,7 +1389,7 @@ export function HodoscopeEmbeddingMap({
               size="icon"
               variant="ghost"
               className="h-7 w-7 rounded-r-none"
-              aria-label="Zoom out"
+              aria-label={t('analysis.hodoscope.map.zoomOut')}
               onClick={() => zoomAt(view.scale / 1.35)}
               disabled={view.scale <= MIN_ZOOM}
             >
@@ -1313,7 +1403,7 @@ export function HodoscopeEmbeddingMap({
               size="icon"
               variant="ghost"
               className="h-7 w-7 rounded-none"
-              aria-label="Zoom in"
+              aria-label={t('analysis.hodoscope.map.zoomIn')}
               onClick={() => zoomAt(view.scale * 1.35)}
               disabled={view.scale >= MAX_ZOOM}
             >
@@ -1324,7 +1414,7 @@ export function HodoscopeEmbeddingMap({
               size="icon"
               variant="ghost"
               className="h-7 w-7 rounded-l-none"
-              aria-label="Fit embedding"
+              aria-label={t('analysis.hodoscope.map.fitEmbedding')}
               onClick={resetView}
             >
               <Focus className="h-3.5 w-3.5" />
@@ -1382,7 +1472,7 @@ export function HodoscopeEmbeddingMap({
           )}
         >
           <Move className="h-3 w-3" />
-          Drag to pan · wheel or buttons to zoom
+          {t('analysis.hodoscope.map.panZoomHelp')}
         </div>
       </div>
     </div>
@@ -1392,9 +1482,11 @@ export function HodoscopeEmbeddingMap({
     <aside className="flex h-full min-h-0 flex-col bg-card">
       <div className="flex items-center justify-between border-b border-border/70 px-3 py-2.5">
         <div>
-          <div className="text-xs font-semibold">Action inspector</div>
+          <div className="text-xs font-semibold">
+            {t('analysis.hodoscope.inspector.title')}
+          </div>
           <div className="text-[11px] text-muted-foreground">
-            Selection stays put while you explore
+            {t('analysis.hodoscope.inspector.subtitle')}
           </div>
         </div>
         <div className="flex items-center gap-1">
@@ -1405,8 +1497,8 @@ export function HodoscopeEmbeddingMap({
             className="h-7 w-7"
             aria-label={
               selectedPathPointIds.length > 0
-                ? 'Select previous action in this run path'
-                : 'Select previous visible action'
+                ? t('analysis.hodoscope.inspector.previousPathAction')
+                : t('analysis.hodoscope.inspector.previousVisibleAction')
             }
             onClick={() => moveInspectorSelection(-1)}
             disabled={
@@ -1424,8 +1516,8 @@ export function HodoscopeEmbeddingMap({
             className="h-7 w-7"
             aria-label={
               selectedPathPointIds.length > 0
-                ? 'Select next action in this run path'
-                : 'Select next visible action'
+                ? t('analysis.hodoscope.inspector.nextPathAction')
+                : t('analysis.hodoscope.inspector.nextVisibleAction')
             }
             onClick={() => moveInspectorSelection(1)}
             disabled={
@@ -1451,13 +1543,15 @@ export function HodoscopeEmbeddingMap({
                     outcomeBadgeClass(normalizeOutcome(selectedPoint))
                   )}
                 >
-                  {OUTCOME_LABELS[normalizeOutcome(selectedPoint)]}
+                  {outcomeLabels[normalizeOutcome(selectedPoint)]}
                 </Badge>
                 <Badge variant="secondary" className="max-w-full truncate">
                   {selectedPoint.group}
                 </Badge>
                 <span className="ml-auto text-[11px] tabular-nums text-muted-foreground">
-                  FPS {selectedPoint.fps_rank}
+                  {t('analysis.hodoscope.representatives.fpsRank', {
+                    rank: selectedPoint.fps_rank,
+                  })}
                 </span>
               </div>
               <h3 className="text-sm font-semibold leading-snug">
@@ -1471,25 +1565,32 @@ export function HodoscopeEmbeddingMap({
             </div>
 
             {tagCatalog.length > 0 ? (
-              <section className="space-y-2" aria-label="Action tags">
+              <section
+                className="space-y-2"
+                aria-label={t('analysis.hodoscope.tags.actionTags')}
+              >
                 <div className="flex items-center justify-between">
-                  <div className="text-xs font-semibold">Tags</div>
+                  <div className="text-xs font-semibold">
+                    {t('analysis.hodoscope.tags.label')}
+                  </div>
                   <div className="text-[10px] tabular-nums text-muted-foreground">
-                    {selectedPointTags.length} attached
+                    {t('analysis.hodoscope.tags.attachedCount', {
+                      count: selectedPointTags.length,
+                    })}
                   </div>
                 </div>
 
                 {selectedPointScopedTags.length > 0 ? (
                   <div className="space-y-1.5">
                     <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      Point tags
+                      {t('analysis.hodoscope.tags.pointTags')}
                     </div>
                     <div className="space-y-1">
                       {selectedPointScopedTags.map((tag) => (
                         <div
                           key={tag.id}
                           className="rounded-md border border-border/70 bg-background px-2 py-1.5"
-                          title={`${getTagScopeLabel(tag)} · ${getTagSourceLabel(tag)}`}
+                          title={`${getTagScopeLabel(tag, tagLabels)} · ${getTagSourceLabel(tag, tagLabels)}`}
                         >
                           <Badge
                             variant="secondary"
@@ -1500,7 +1601,8 @@ export function HodoscopeEmbeddingMap({
                             </span>
                           </Badge>
                           <div className="mt-1 text-[10px] text-muted-foreground">
-                            Point · {getTagSourceLabel(tag)}
+                            {getTagScopeLabel(tag, tagLabels)} ·{' '}
+                            {getTagSourceLabel(tag, tagLabels)}
                           </div>
                         </div>
                       ))}
@@ -1511,14 +1613,14 @@ export function HodoscopeEmbeddingMap({
                 {selectedRunTags.length > 0 ? (
                   <div className="space-y-1.5">
                     <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      Run tags · inherited
+                      {t('analysis.hodoscope.tags.runTagsInherited')}
                     </div>
                     <div className="space-y-1">
                       {selectedRunTags.map((tag) => (
                         <div
                           key={tag.id}
                           className="rounded-md border border-blue-border/70 bg-blue-bg/20 px-2 py-1.5"
-                          title={`${getTagScopeLabel(tag)} · ${getTagSourceLabel(tag)}`}
+                          title={`${getTagScopeLabel(tag, tagLabels)} · ${getTagSourceLabel(tag, tagLabels)}`}
                         >
                           <Badge
                             variant="outline"
@@ -1529,7 +1631,8 @@ export function HodoscopeEmbeddingMap({
                             </span>
                           </Badge>
                           <div className="mt-1 text-[10px] text-muted-foreground">
-                            Run · inherited · {getTagSourceLabel(tag)}
+                            {getTagScopeLabel(tag, tagLabels)} ·{' '}
+                            {getTagSourceLabel(tag, tagLabels)}
                           </div>
                         </div>
                       ))}
@@ -1539,7 +1642,7 @@ export function HodoscopeEmbeddingMap({
 
                 {selectedPointTags.length === 0 ? (
                   <div className="rounded-md border border-dashed border-border px-2 py-3 text-center text-[11px] text-muted-foreground">
-                    No tags are attached to this action.
+                    {t('analysis.hodoscope.tags.noneAttached')}
                   </div>
                 ) : null}
               </section>
@@ -1548,7 +1651,9 @@ export function HodoscopeEmbeddingMap({
             <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1.5 border-y border-border/60 py-3 text-[11px]">
               {selectedPoint.task_id ? (
                 <>
-                  <dt className="text-muted-foreground">Task</dt>
+                  <dt className="text-muted-foreground">
+                    {t('analysis.hodoscope.inspector.task')}
+                  </dt>
                   <dd
                     className="truncate font-medium"
                     title={selectedPoint.task_id}
@@ -1557,14 +1662,20 @@ export function HodoscopeEmbeddingMap({
                   </dd>
                 </>
               ) : null}
-              <dt className="text-muted-foreground">Transcript</dt>
+              <dt className="text-muted-foreground">
+                {t('analysis.hodoscope.inspector.transcript')}
+              </dt>
               <dd className="font-medium tabular-nums">
-                {selectedPoint.transcript_idx + 1} · action{' '}
-                {selectedPoint.action_unit_idx + 1}
+                {t('analysis.hodoscope.inspector.transcriptAction', {
+                  transcript: selectedPoint.transcript_idx + 1,
+                  action: selectedPoint.action_unit_idx + 1,
+                })}
               </dd>
               {selectedPoint.exception_type ? (
                 <>
-                  <dt className="text-muted-foreground">Exception</dt>
+                  <dt className="text-muted-foreground">
+                    {t('analysis.hodoscope.inspector.exception')}
+                  </dt>
                   <dd className="truncate font-medium text-orange-text">
                     {selectedPoint.exception_type}
                   </dd>
@@ -1578,12 +1689,15 @@ export function HodoscopeEmbeddingMap({
                   <div>
                     <div className="flex items-center gap-1.5 text-xs font-semibold">
                       <Route className="h-3.5 w-3.5 text-blue-text" />
-                      Run path
+                      {t('analysis.hodoscope.path.title')}
                     </div>
                     <div className="mt-1 text-[10px] tabular-nums text-muted-foreground">
                       {selectedPathStepIndex >= 0
-                        ? `Step ${selectedPathStepIndex + 1} of ${selectedPathPointIds.length}`
-                        : 'Selected action is not in the ordered path'}
+                        ? t('analysis.hodoscope.path.stepCount', {
+                            step: selectedPathStepIndex + 1,
+                            count: selectedPathPointIds.length,
+                          })
+                        : t('analysis.hodoscope.path.notInOrderedPath')}
                     </div>
                   </div>
                   <Badge
@@ -1598,10 +1712,10 @@ export function HodoscopeEmbeddingMap({
                     )}
                   >
                     {selectedTrajectoryPath.complete === true
-                      ? 'Complete'
+                      ? t('analysis.hodoscope.path.complete')
                       : selectedTrajectoryPath.complete === false
-                        ? 'Sampled'
-                        : 'Coverage unknown'}
+                        ? t('analysis.hodoscope.path.sampled')
+                        : t('analysis.hodoscope.path.coverageUnknown')}
                   </Badge>
                 </div>
                 <div className="mt-2 text-[11px] font-medium tabular-nums">
@@ -1619,7 +1733,9 @@ export function HodoscopeEmbeddingMap({
                   onClick={() => setShowSelectedPath((current) => !current)}
                 >
                   <Route className="h-3 w-3" />
-                  {showSelectedPath ? 'Hide path' : 'Show path'}
+                  {showSelectedPath
+                    ? t('analysis.hodoscope.path.hide')
+                    : t('analysis.hodoscope.path.show')}
                 </Button>
               </section>
             ) : null}
@@ -1630,17 +1746,17 @@ export function HodoscopeEmbeddingMap({
               size="sm"
               onClick={() => onOpenPoint(selectedPoint)}
             >
-              Open source run
+              {t('analysis.hodoscope.openSourceRun')}
               <ExternalLink className="h-3.5 w-3.5" />
             </Button>
 
             <div>
               <div className="mb-2 flex items-center justify-between">
                 <div className="text-xs font-semibold">
-                  Representative actions
+                  {t('analysis.hodoscope.representatives.title')}
                 </div>
                 <div className="text-[10px] text-muted-foreground">
-                  FPS diversity sample
+                  {t('analysis.hodoscope.representatives.fpsDiversity')}
                 </div>
               </div>
               <div className="space-y-1">
@@ -1675,7 +1791,9 @@ export function HodoscopeEmbeddingMap({
                         {point.summary}
                       </span>
                       <span className="mt-1 block text-[10px] text-muted-foreground">
-                        FPS {point.fps_rank}
+                        {t('analysis.hodoscope.representatives.fpsRank', {
+                          rank: point.fps_rank,
+                        })}
                         {point.task_id ? ` · ${point.task_id}` : ''}
                       </span>
                     </span>
@@ -1689,17 +1807,20 @@ export function HodoscopeEmbeddingMap({
             <div className="mb-3 rounded-full border border-border bg-muted/40 p-3">
               <Focus className="h-5 w-5 text-muted-foreground" />
             </div>
-            <div className="text-sm font-medium">Select an action</div>
+            <div className="text-sm font-medium">
+              {t('analysis.hodoscope.inspector.selectAction')}
+            </div>
             <p className="mt-1 max-w-60 text-xs leading-relaxed text-muted-foreground">
-              Click a point or use the arrow keys while the map is focused.
+              {t('analysis.hodoscope.inspector.selectActionHelp')}
             </p>
           </div>
         )}
       </div>
 
       <div className="border-t border-border/70 bg-muted/20 px-3 py-2 text-[10px] leading-relaxed text-muted-foreground">
-        {projection.projection_method.toUpperCase()} axes have no semantic
-        units. Read local neighborhoods more strongly than global distance.
+        {t('analysis.hodoscope.map.axesNote', {
+          method: projection.projection_method.toUpperCase(),
+        })}
       </div>
     </aside>
   );
@@ -1729,7 +1850,7 @@ export function HodoscopeEmbeddingMap({
         </ResizablePanel>
         <ResizableHandle
           withHandle
-          aria-label="Resize Hodoscope map and inspector"
+          aria-label={t('analysis.hodoscope.map.resize')}
         />
         <ResizablePanel
           id="hodoscope-inspector"

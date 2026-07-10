@@ -17,6 +17,8 @@ import {
   useUserContext,
 } from '../../contexts/UserContext';
 import { toast } from '@/hooks/use-toast';
+import { useLocale } from '@/app/contexts/LocaleContext';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 
 export const UserProfile = () => {
   // User is guaranteed to be present since this component is only used in authenticated areas
@@ -26,6 +28,7 @@ export const UserProfile = () => {
 
   // Use base useUser for logout to access setUser that accepts null
   const { setUser } = useUserContext();
+  const { t } = useLocale();
 
   const handleLogout = async () => {
     try {
@@ -36,8 +39,8 @@ export const UserProfile = () => {
     } catch (error) {
       console.error('Logout failed:', error);
       toast({
-        title: 'Logout Error',
-        description: 'Failed to logout. Please try again.',
+        title: t('profile.logoutErrorTitle'),
+        description: t('profile.logoutErrorDescription'),
         variant: 'destructive',
       });
     }
@@ -64,7 +67,9 @@ export const UserProfile = () => {
       <DropdownMenuContent className="w-56" align="end" forceMount>
         <DropdownMenuLabel className="font-normal text-xs">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">Account</p>
+            <p className="text-sm font-medium leading-none">
+              {t('profile.account')}
+            </p>
             <p className="text-[11px] leading-none text-muted-foreground">
               {user.email}
             </p>
@@ -75,10 +80,11 @@ export const UserProfile = () => {
           onClick={() => (window.location.href = '/settings')}
           className="text-sm"
         >
-          Settings
+          {t('profile.settings')}
         </DropdownMenuItem>
+        <LanguageSwitcher mode="menu-item" />
         <DropdownMenuItem onClick={handleLogout} className="text-sm">
-          Log out
+          {t('profile.logout')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

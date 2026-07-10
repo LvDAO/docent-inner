@@ -1,3 +1,5 @@
+'use client';
+
 import { KeyRound } from 'lucide-react';
 import {
   Tooltip,
@@ -10,8 +12,11 @@ import { ModelOption } from '@/app/store/rubricSlice';
 import { cn } from '@/lib/utils';
 import { useMemo } from 'react';
 import { Combobox, type ComboboxOption } from '@/app/components/Combobox';
+import { useLocale } from '@/app/contexts/LocaleContext';
 
-function nameModel(model: ModelOption, shortenName = false) {
+type Translate = ReturnType<typeof useLocale>['t'];
+
+function nameModel(model: ModelOption, t: Translate, shortenName = false) {
   if (shortenName) {
     let shortName = model.model_name;
 
@@ -31,7 +36,7 @@ function nameModel(model: ModelOption, shortenName = false) {
   }
 
   if (model.reasoning_effort) {
-    return `${model.provider}/${model.model_name} (${model.reasoning_effort} reasoning effort)`;
+    return `${model.provider}/${model.model_name} (${t('chat.model.reasoningEffort', { effort: model.reasoning_effort })})`;
   }
   return `${model.provider}/${model.model_name}`;
 }
@@ -55,6 +60,7 @@ export default function ModelPicker({
   borderless = false,
   shortenName = false,
 }: ModelPickerProps) {
+  const { t } = useLocale();
   // availableModels may have info (e.g. uses_byok) that is not stored in the database.
   // So when selectedModel comes from the database we need to get that info from availableModels
   const selectedModelWithInfo = useMemo(() => {
@@ -104,7 +110,7 @@ export default function ModelPicker({
       valueToModel.set(value, model);
       return {
         value,
-        label: nameModel(model),
+        label: nameModel(model, t),
         keywords: [
           model.provider,
           model.model_name,
@@ -119,7 +125,7 @@ export default function ModelPicker({
       valueToModel,
       toValue,
     };
-  }, [availableModels, selectedModelWithInfo]);
+  }, [availableModels, selectedModelWithInfo, t]);
 
   const { options, valueToModel, toValue } = modelOptions;
 
@@ -137,9 +143,9 @@ export default function ModelPicker({
           onChange(selected);
         }}
         options={options}
-        placeholder="Select model"
-        searchPlaceholder="Search models..."
-        emptyMessage="No models found"
+        placeholder={t('chat.model.select')}
+        searchPlaceholder={t('chat.model.search')}
+        emptyMessage={t('chat.model.empty')}
         triggerProps={{ disabled, variant: borderless ? 'ghost' : 'outline' }}
         triggerClassName={cn(
           'h-7 text-xs font-normal',
@@ -153,12 +159,12 @@ export default function ModelPicker({
             ? valueToModel.get(selectedOption.value)
             : selectedModelWithInfo;
           if (!model) {
-            return 'Select model';
+            return t('chat.model.select');
           }
           return (
             <span className="flex items-center gap-1">
               <span className="flex-1 truncate">
-                {nameModel(model, shortenName)}
+                {nameModel(model, t, shortenName)}
               </span>
               {model.uses_byok && (
                 <Tooltip>
@@ -167,7 +173,7 @@ export default function ModelPicker({
                   </TooltipTrigger>
                   <TooltipPortal>
                     <TooltipContent side="top">
-                      <p>This model uses your own API key</p>
+                      <p>{t('chat.model.byok')}</p>
                     </TooltipContent>
                   </TooltipPortal>
                 </Tooltip>
@@ -182,7 +188,7 @@ export default function ModelPicker({
           }
           return (
             <span className="flex items-center gap-1 w-full">
-              <span className="flex-1">{nameModel(model)}</span>
+              <span className="flex-1">{nameModel(model, t)}</span>
               {model.uses_byok && (
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -190,7 +196,7 @@ export default function ModelPicker({
                   </TooltipTrigger>
                   <TooltipPortal>
                     <TooltipContent>
-                      <p>This model uses your own API key</p>
+                      <p>{t('chat.model.byok')}</p>
                     </TooltipContent>
                   </TooltipPortal>
                 </Tooltip>

@@ -24,6 +24,7 @@ import {
 import { Plus, Trash2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { apiRestClient } from '@/app/services/apiService';
+import { useLocale } from '@/app/contexts/LocaleContext';
 
 interface ModelApiKey {
   id: string;
@@ -31,12 +32,10 @@ interface ModelApiKey {
   masked_api_key: string;
 }
 
-const PROVIDERS = [
-  { value: 'deepseek', label: 'DeepSeek' },
-  { value: 'custom', label: 'Custom endpoint' },
-] as const;
+const PROVIDERS = [{ value: 'deepseek' }, { value: 'custom' }] as const;
 
 export default function ModelProvidersPage() {
+  const { t } = useLocale();
   const [modelApiKeys, setModelApiKeys] = useState<ModelApiKey[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -51,8 +50,8 @@ export default function ModelProvidersPage() {
     } catch (error) {
       console.error('Failed to fetch model API keys:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to load model API keys',
+        title: t('common.error'),
+        description: t('modelProviders.loadFailed'),
         variant: 'destructive',
       });
     } finally {
@@ -86,8 +85,8 @@ export default function ModelProvidersPage() {
     } catch (error) {
       console.error('Failed to save model API key:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to save model API key',
+        title: t('common.error'),
+        description: t('modelProviders.saveFailed'),
         variant: 'destructive',
       });
     } finally {
@@ -102,16 +101,17 @@ export default function ModelProvidersPage() {
     } catch (error) {
       console.error('Failed to delete model API key:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to delete model API key',
+        title: t('common.error'),
+        description: t('modelProviders.deleteFailed'),
         variant: 'destructive',
       });
     }
   };
 
   const getProviderLabel = (provider: string) => {
-    const providerConfig = PROVIDERS.find((p) => p.value === provider);
-    return providerConfig?.label || provider;
+    if (provider === 'custom') return t('modelProviders.customEndpoint');
+    if (provider === 'deepseek') return 'DeepSeek';
+    return provider;
   };
 
   const availableProviders = getAvailableProviders();
@@ -120,10 +120,9 @@ export default function ModelProvidersPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Model Providers</h1>
+          <h1 className="text-3xl font-bold">{t('modelProviders.title')}</h1>
           <p className="text-muted-foreground">
-            You can use Docent with your own model API keys to access more
-            models and higher rate limits.
+            {t('modelProviders.description')}
           </p>
         </div>
 
@@ -131,44 +130,45 @@ export default function ModelProvidersPage() {
           <DialogTrigger asChild>
             <Button disabled={availableProviders.length === 0}>
               <Plus className="mr-2 h-4 w-4" />
-              Add Provider
+              {t('modelProviders.add')}
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add Model Provider</DialogTitle>
+              <DialogTitle>{t('modelProviders.addTitle')}</DialogTitle>
               <DialogDescription>
-                Add an API key for a model provider. You can only have one key
-                per provider.
+                {t('modelProviders.addDescription')}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label htmlFor="provider">Provider</Label>
+                <Label htmlFor="provider">{t('modelProviders.provider')}</Label>
                 <Select
                   value={selectedProvider}
                   onValueChange={setSelectedProvider}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select a provider" />
+                    <SelectValue
+                      placeholder={t('modelProviders.selectProvider')}
+                    />
                   </SelectTrigger>
                   <SelectContent>
                     {availableProviders.map((provider) => (
                       <SelectItem key={provider.value} value={provider.value}>
-                        {provider.label}
+                        {getProviderLabel(provider.value)}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <Label htmlFor="apiKey">API Key</Label>
+                <Label htmlFor="apiKey">{t('modelProviders.apiKey')}</Label>
                 <Input
                   id="apiKey"
                   type="password"
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
-                  placeholder="Enter your API key"
+                  placeholder={t('modelProviders.apiKeyPlaceholder')}
                 />
               </div>
             </div>
@@ -181,13 +181,15 @@ export default function ModelProvidersPage() {
                   setApiKey('');
                 }}
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button
                 onClick={handleSaveApiKey}
                 disabled={isSaving || !selectedProvider || !apiKey.trim()}
               >
-                {isSaving ? 'Saving...' : 'Save API Key'}
+                {isSaving
+                  ? t('modelProviders.saving')
+                  : t('modelProviders.save')}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -198,7 +200,7 @@ export default function ModelProvidersPage() {
         <Card className="border-blue-200 bg-blue-50">
           <CardContent>
             <p className="text-sm text-blue-800">
-              You have configured all available providers.
+              {t('modelProviders.allConfigured')}
             </p>
           </CardContent>
         </Card>
@@ -208,15 +210,14 @@ export default function ModelProvidersPage() {
         {isLoading ? (
           <Card>
             <CardContent className="pt-6">
-              <div>Loading...</div>
+              <div>{t('common.loading')}</div>
             </CardContent>
           </Card>
         ) : modelApiKeys.length === 0 ? (
           <Card>
             <CardContent className="pt-6">
               <div className="text-center py-8 text-muted-foreground">
-                No model providers configured. Add your first API key to get
-                started.
+                {t('modelProviders.empty')}
               </div>
             </CardContent>
           </Card>
@@ -235,6 +236,7 @@ export default function ModelProvidersPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => handleDeleteApiKey(key.provider)}
+                      aria-label={t('modelProviders.delete')}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>

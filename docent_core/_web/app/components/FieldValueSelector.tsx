@@ -18,6 +18,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { useGetFieldValuesQuery } from '../api/collectionApi';
+import { useLocale } from '../contexts/LocaleContext';
 
 interface FieldValueSelectorProps {
   collectionId: string;
@@ -33,9 +34,10 @@ export const FieldValueSelector = ({
   fieldName,
   value,
   onValueChange,
-  placeholder = 'Select value...',
+  placeholder,
   className,
 }: FieldValueSelectorProps) => {
+  const { t } = useLocale();
   const [open, setOpen] = useState(false);
 
   const { data: fieldValuesData, isLoading } = useGetFieldValuesQuery(
@@ -57,16 +59,21 @@ export const FieldValueSelector = ({
             className
           )}
         >
-          {value || placeholder}
+          {value || (placeholder ?? t('misc.fieldValue.select'))}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[200px] p-0">
         <Command>
-          <CommandInput placeholder="Search values..." className="h-9" />
+          <CommandInput
+            placeholder={t('misc.fieldValue.search')}
+            className="h-9"
+          />
           <CommandList>
             <CommandEmpty>
-              {isLoading ? 'Loading...' : 'No values found.'}
+              {isLoading
+                ? t('misc.fieldValue.loading')
+                : t('misc.fieldValue.empty')}
             </CommandEmpty>
             <CommandGroup>
               {values.map((val) => (

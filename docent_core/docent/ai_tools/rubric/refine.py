@@ -11,6 +11,11 @@ from docent.data_models.chat.tool import (
     ToolParams,
 )
 from docent_core._llm_util.data_models.llm_output import LLMOutput
+from docent_core._llm_util.localization import (
+    SupportedLocale,
+    get_response_locale,
+    normalize_locale,
+)
 from docent_core._llm_util.prod_llms import MessagesInput, get_llm_completions_async
 from docent_core._llm_util.providers.preferences import PROVIDER_PREFERENCES
 from docent_core.docent.ai_tools.rubric.rubric import (
@@ -48,6 +53,34 @@ Hi! Let's build a concrete rubric that captures the behavior you're looking for.
 - In the meantime, I'll ask you some questions to clarify specific ambiguities.
 - At any time, you can ask me to update the rubric based on feedback.
 """.strip()
+
+GUIDED_SEARCH_WELCOME_MESSAGE_ZH_CN = """
+你好！我们来一起制定一套具体的评判标准，准确描述你要查找的行为。
+- 首先，我会浏览你的数据集，找出可能匹配且有助于澄清需求的示例。
+- 然后，我会提出初版评判标准，听取你的整体反馈，并逐一询问需要明确的细节。
+- 每次更新评判标准后，系统都会重新运行；你可以在左侧查看最新结果。
+""".strip()
+
+DIRECT_SEARCH_WELCOME_MESSAGE_ZH_CN = """
+你好！我们来一起制定一套具体的评判标准，准确描述你要查找的行为。
+- 你可以先查看并标注查询结果。
+- 同时，我会逐一提问，帮助你明确具体的歧义点。
+- 你随时可以根据反馈让我更新评判标准。
+""".strip()
+
+
+def get_refinement_welcome_message(
+    *, is_guided: bool, locale: SupportedLocale | None = None
+) -> str:
+    resolved_locale = normalize_locale(locale) if locale is not None else get_response_locale()
+    if resolved_locale == "zh-CN":
+        return (
+            GUIDED_SEARCH_WELCOME_MESSAGE_ZH_CN
+            if is_guided
+            else DIRECT_SEARCH_WELCOME_MESSAGE_ZH_CN
+        )
+    return GUIDED_SEARCH_WELCOME_MESSAGE if is_guided else DIRECT_SEARCH_WELCOME_MESSAGE
+
 
 ##################
 # System prompts #

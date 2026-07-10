@@ -8,19 +8,21 @@ export interface HodoscopeTagFacetGroup {
   tags: HodoscopeTagCatalogEntry[];
 }
 
-const TAG_SOURCE_LABELS: Record<HodoscopeTagCatalogEntry['source'], string> = {
-  metadata: 'Metadata',
-  rubric_cluster: 'Rubric cluster',
-  point_rubric: 'Point rubric',
-  manual: 'Manual',
-};
+export interface HodoscopeTagLabels {
+  sources: Record<HodoscopeTagCatalogEntry['source'], string>;
+  pointScope: string;
+  runInheritedScope: string;
+}
 
 export function getTagDisplayLabel(tag: HodoscopeTagCatalogEntry) {
   return tag.label;
 }
 
-export function getTagSourceLabel(tag: HodoscopeTagCatalogEntry) {
-  const sourceLabel = tag.source_label || TAG_SOURCE_LABELS[tag.source];
+export function getTagSourceLabel(
+  tag: HodoscopeTagCatalogEntry,
+  labels: HodoscopeTagLabels
+) {
+  const sourceLabel = tag.source_label || labels.sources[tag.source];
   if (
     tag.result_label &&
     !sourceLabel.toLowerCase().includes(tag.result_label.toLowerCase())
@@ -30,10 +32,13 @@ export function getTagSourceLabel(tag: HodoscopeTagCatalogEntry) {
   return sourceLabel;
 }
 
-export function getTagScopeLabel(tag: HodoscopeTagCatalogEntry) {
+export function getTagScopeLabel(
+  tag: HodoscopeTagCatalogEntry,
+  labels: HodoscopeTagLabels
+) {
   return tag.scope === 'trajectory' || tag.inherited
-    ? 'Run · inherited'
-    : 'Point';
+    ? labels.runInheritedScope
+    : labels.pointScope;
 }
 
 export function buildTagLookup(tags: HodoscopeTagCatalogEntry[]) {
@@ -74,13 +79,14 @@ export function matchesPointTagFilters(
 export function matchesHodoscopeSearch(
   point: HodoscopeProjectionPoint,
   normalizedQuery: string,
-  tagById: Map<string, HodoscopeTagCatalogEntry>
+  tagById: Map<string, HodoscopeTagCatalogEntry>,
+  labels: HodoscopeTagLabels
 ) {
   if (!normalizedQuery) return true;
 
   const tagText = getPointTags(point, tagById).flatMap((tag) => [
     getTagDisplayLabel(tag),
-    getTagSourceLabel(tag),
+    getTagSourceLabel(tag, labels),
     tag.field,
   ]);
 
@@ -100,11 +106,12 @@ export function matchesHodoscopeSearch(
 
 export function groupTagCatalog(
   tags: HodoscopeTagCatalogEntry[],
-  normalizedQuery: string
+  normalizedQuery: string,
+  labels: HodoscopeTagLabels
 ): HodoscopeTagFacetGroup[] {
   const matchingTags = normalizedQuery
     ? tags.filter((tag) =>
-        [getTagDisplayLabel(tag), getTagSourceLabel(tag), tag.field]
+        [getTagDisplayLabel(tag), getTagSourceLabel(tag, labels), tag.field]
           .filter((value): value is string => Boolean(value))
           .join(' ')
           .toLowerCase()

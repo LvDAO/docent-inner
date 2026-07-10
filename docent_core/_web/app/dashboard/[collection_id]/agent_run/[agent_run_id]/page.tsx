@@ -20,9 +20,11 @@ import AgentRunViewer, {
 } from '../components/AgentRunViewer';
 import TranscriptChat from '@/components/TranscriptChat';
 import { useCitationNavigation } from '../../rubric/[rubric_id]/NavigateToCitationContext';
+import { useLocale } from '@/app/contexts/LocaleContext';
 
 export default function AgentRunPage() {
   const dispatch = useAppDispatch();
+  const { t } = useLocale();
 
   const collectionId = useAppSelector(
     (state) => state.collection?.collectionId
@@ -105,7 +107,7 @@ export default function AgentRunPage() {
         {rightSidebarOpen && (
           <React.Fragment key="agent-details">
             <ResizableHandle
-              aria-label="Resize transcript and agent details"
+              aria-label={t('analysis.viewer.resizeTranscriptDetails')}
               id="agent-run-detail-handle"
               withHandle
             />
@@ -127,10 +129,10 @@ export default function AgentRunPage() {
                 >
                   <TabsList className="grid h-8 w-full shrink-0 grid-cols-2">
                     <TabsTrigger value="agent" className="text-xs">
-                      Summary
+                      {t('results.agent.summary')}
                     </TabsTrigger>
                     <TabsTrigger value="chat" className="text-xs">
-                      Chat
+                      {t('results.agent.chat')}
                     </TabsTrigger>
                   </TabsList>
 
@@ -145,7 +147,7 @@ export default function AgentRunPage() {
                       <TranscriptChat
                         runId={curAgentRunId}
                         collectionId={collectionId}
-                        title="Transcript Chat"
+                        title={t('results.agent.transcriptChat')}
                         className="flex min-h-0 min-w-0 flex-1 flex-col"
                       />
                     </div>

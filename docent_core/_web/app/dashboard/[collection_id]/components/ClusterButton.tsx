@@ -16,6 +16,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useRubricVersion } from '@/providers/use-rubric-version';
+import { useLocale } from '@/app/contexts/LocaleContext';
 import { useState } from 'react';
 
 interface ClusterButtonProps {
@@ -33,6 +34,7 @@ const ClusterButton = ({
   clusteringJobId,
   hasCentroids,
 }: ClusterButtonProps) => {
+  const { t } = useLocale();
   // Cancel clustering job
   const [cancelClusteringJob, { isLoading: isCancellingClustering }] =
     useCancelClusteringJobMutation();
@@ -97,7 +99,9 @@ const ClusterButton = ({
         variant="outline"
         onClick={() => handleStartClustering(undefined, false)}
       >
-        {isStartingClustering ? 'Starting clustering...' : 'Cluster'}
+        {isStartingClustering
+          ? t('analysis.cluster.starting')
+          : t('analysis.cluster.cluster')}
       </Button>
     );
   };
@@ -115,17 +119,17 @@ const ClusterButton = ({
           variant="outline"
           disabled={clusteringJobId !== null || hasUnsavedChanges}
         >
-          {clusteringJobId ? 'Proposing...' : 'Re-cluster results'}
+          {clusteringJobId
+            ? t('analysis.cluster.proposing')
+            : t('analysis.cluster.reclusterResults')}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-96 p-2 space-y-2">
         <div className="space-y-2">
-          <div className="text-sm">
-            Provide feedback for re-clustering (optional)
-          </div>
+          <div className="text-sm">{t('analysis.cluster.feedback')}</div>
           <Textarea
             id="feedback"
-            placeholder="Describe how you'd like clusters to be improved..."
+            placeholder={t('analysis.cluster.feedbackPlaceholder')}
             value={feedbackText}
             onChange={(e) => setFeedbackText(e.target.value)}
             className="min-h-[80px] resize-none text-xs"
@@ -139,7 +143,7 @@ const ClusterButton = ({
             className="text-xs"
             onClick={handleReclusterCancel}
           >
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button
             type="button"
@@ -148,7 +152,9 @@ const ClusterButton = ({
             onClick={handleReclusterSubmit}
             disabled={clusteringJobId !== null}
           >
-            {clusteringJobId !== null ? 'Proposing...' : 'Re-cluster'}
+            {clusteringJobId !== null
+              ? t('analysis.cluster.proposing')
+              : t('analysis.cluster.recluster')}
           </Button>
         </div>
       </PopoverContent>
@@ -169,7 +175,7 @@ const ClusterButton = ({
                 </div>
               </TooltipTrigger>
               <TooltipContent side="bottom">
-                Switch to the latest version to cluster.
+                {t('analysis.cluster.latestVersionRequired')}
               </TooltipContent>
             </Tooltip>
           )}
@@ -186,7 +192,9 @@ const ClusterButton = ({
             variant="outline"
             onClick={handleClearClusters}
           >
-            {isClearingClusters ? 'Clearing…' : 'Clear clusters'}
+            {isClearingClusters
+              ? t('analysis.cluster.clearing')
+              : t('analysis.cluster.clear')}
           </Button>
         </>
       )}
@@ -200,8 +208,8 @@ const ClusterButton = ({
           onClick={handleCancelClustering}
         >
           {isCancellingClustering
-            ? 'Stopping clustering...'
-            : 'Stop clustering'}
+            ? t('analysis.cluster.stopping')
+            : t('analysis.cluster.stop')}
         </Button>
       )}
     </>

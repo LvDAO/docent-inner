@@ -30,6 +30,7 @@ import ShareRubricButton from './ShareRubricButton';
 import { useRefinementTab } from '@/providers/use-refinement-tab';
 import { usePostRubricUpdateToRefinementSessionMutation } from '@/app/api/refinementApi';
 import { toast } from '@/hooks/use-toast';
+import { useLocale } from '@/app/contexts/LocaleContext';
 
 interface SingleRubricAreaProps {
   rubricId: string;
@@ -40,6 +41,7 @@ export default function SingleRubricArea({
   rubricId,
   sessionId,
 }: SingleRubricAreaProps) {
+  const { t } = useLocale();
   const { collection_id: collectionId, result_id: resultId } = useParams<{
     collection_id: string;
     result_id?: string;
@@ -71,7 +73,7 @@ export default function SingleRubricArea({
     clusteringJobId,
     centroids,
 
-    // Clustering results
+    // Completed cluster assignments
     assignments,
     // Loading flags
     isResultsLoading,
@@ -109,8 +111,8 @@ export default function SingleRubricArea({
 
       if (postRubricUpdateError) {
         toast({
-          title: 'Error',
-          description: 'Failed to update refinement session',
+          title: t('misc.rubric.updateSessionFailedTitle'),
+          description: t('misc.rubric.updateSessionFailedDescription'),
           variant: 'destructive',
         });
       } else {
@@ -158,7 +160,7 @@ export default function SingleRubricArea({
             variant="outline"
             className={cn('h-7 w-7 text-xs', labeled ? 'bg-blue-bg' : '')}
             onClick={() => setLabeled(!labeled)}
-            title="Show only labeled results"
+            title={t('misc.rubric.showOnlyLabeled')}
           >
             <Tags
               className={labeled ? 'h-3 w-3 stroke-blue-text' : 'h-3 w-3'}
@@ -215,7 +217,7 @@ export default function SingleRubricArea({
       {clusteringJobId !== null && (
         <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground px-0.5">
           <Loader2 size={16} className="animate-spin text-muted-foreground" />
-          Clustering results...
+          {t('misc.rubric.clusteringResults')}
         </div>
       )}
 
@@ -226,7 +228,7 @@ export default function SingleRubricArea({
         </div>
       ) : !rubricJobId && judgeResults.length === 0 && !labeled ? (
         <div className="text-xs text-muted-foreground text-center">
-          No results yet
+          {t('misc.rubric.noResults')}
         </div>
       ) : (
         <JudgeResultsList

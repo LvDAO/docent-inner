@@ -1,3 +1,5 @@
+'use client';
+
 import {
   JudgeRunLabel,
   JudgeResultWithCitations,
@@ -18,6 +20,7 @@ import {
 } from '@/app/dashboard/[collection_id]/rubric/[rubric_id]/NavigateToCitationContext';
 import React from 'react';
 import { useRefinementTab } from '@/providers/use-refinement-tab';
+import { useLocale } from '@/app/contexts/LocaleContext';
 
 interface JudgeResultCardProps {
   judgeResult: JudgeResultWithCitations;
@@ -32,6 +35,7 @@ export const JudgeResultCard = ({
   navToTranscriptOnClick = true,
   active = false,
 }: JudgeResultCardProps) => {
+  const { t } = useLocale();
   const router = useRouter();
   const { collection_id: collectionId } = useParams<{
     collection_id: string;
@@ -101,7 +105,11 @@ export const JudgeResultCard = ({
   );
 
   if (Object.keys(judgeResult.output).length === 0) {
-    return <span className="text-muted-foreground italic">Empty</span>;
+    return (
+      <span className="text-muted-foreground italic">
+        {t('misc.result.empty')}
+      </span>
+    );
   }
 
   return (
@@ -173,6 +181,7 @@ const FieldWithLabel = ({
   labeledValue,
   clearLabelField,
 }: FieldWithLabelProps) => {
+  const { t } = useLocale();
   const labelIsDifferent = labeledValue && labeledValue !== judgeResultValue;
 
   const judgeResultHasCitation = judgeResultValue.citations !== undefined;
@@ -200,7 +209,9 @@ const FieldWithLabel = ({
         ) : (
           <span className={cn(labelIsDifferent && 'line-through opacity-50')}>
             {resolvedJudgeResultValue || (
-              <span className="text-muted-foreground italic">Empty</span>
+              <span className="text-muted-foreground italic">
+                {t('misc.result.empty')}
+              </span>
             )}
           </span>
         )}

@@ -1,5 +1,6 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { BASE_URL } from '@/app/constants';
+import type { Locale } from '@/lib/i18n/locales';
 
 export type HodoscopeAnalysisStatus =
   'pending' | 'running' | 'complete' | 'error' | 'canceled';
@@ -41,6 +42,7 @@ export interface HodoscopeTrajectoryPath {
 
 export interface HodoscopeAnalysisConfig {
   name?: string;
+  locale?: Locale;
   group_by?: string | null;
   limit?: number;
   max_actions?: number;
@@ -110,9 +112,12 @@ export const hodoscopeApi = createApi({
   endpoints: (build) => ({
     listHodoscopeAnalyses: build.query<
       HodoscopeAnalysisSummary[],
-      { collectionId: string }
+      { collectionId: string; locale: Locale }
     >({
-      query: ({ collectionId }) => `/${collectionId}/analyses`,
+      query: ({ collectionId, locale }) => ({
+        url: `/${collectionId}/analyses`,
+        params: { locale },
+      }),
       providesTags: ['HodoscopeAnalysis'],
     }),
     getHodoscopeAnalysis: build.query<
@@ -130,6 +135,7 @@ export const hodoscopeApi = createApi({
       {
         collectionId: string;
         analysisId: string;
+        locale: Locale;
         tagBy?: string | null;
         includeRubricTags?: boolean;
       }

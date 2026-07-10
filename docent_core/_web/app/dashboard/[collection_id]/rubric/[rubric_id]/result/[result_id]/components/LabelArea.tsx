@@ -5,6 +5,7 @@ import {
 } from '@/app/api/rubricApi';
 import LabelForm from './LabelForm';
 import { useRubricVersion } from '@/providers/use-rubric-version';
+import { useLocale } from '@/app/contexts/LocaleContext';
 
 interface LabelAreaProps {
   rubricId: string;
@@ -13,6 +14,7 @@ interface LabelAreaProps {
 }
 
 function LabelArea({ result, collectionId, rubricId }: LabelAreaProps) {
+  const { t } = useLocale();
   // Get the remote rubric
   const { latestVersion } = useRubricVersion();
   const { data: currentViewedRubric } = useGetRubricQuery({
@@ -44,7 +46,7 @@ function LabelArea({ result, collectionId, rubricId }: LabelAreaProps) {
     JSON.stringify(currentViewedRubric?.output_schema);
 
   if (!currentViewedRubric?.output_schema) {
-    return <span>Could not load rubric output schema.</span>;
+    return <span>{t('results.label.schemaLoadFailed')}</span>;
   }
 
   return (
@@ -52,17 +54,20 @@ function LabelArea({ result, collectionId, rubricId }: LabelAreaProps) {
       {/* Scrollable content including header */}
       <div className="flex-1 overflow-y-auto px-0.5 min-h-0">
         <div className="space-y-1 flex flex-col pb-4">
-          <div className="text-sm font-semibold">Label Editor</div>
+          <div className="text-sm font-semibold">
+            {t('results.label.editor')}
+          </div>
           <div className="text-xs text-muted-foreground">
-            Fields reflect the latest output schema for the rubric.
+            {t('results.label.latestSchemaDescription')}
           </div>
         </div>
 
         {isOutdated && (
           <div className="text-xs text-muted-foreground h-[70%] flex text-center items-center p-3 justify-center">
-            This label uses the v{result.rubric_version} rubric schema which is
-            different from the latest v{currentViewedRubric.version} rubric
-            schema. Please select a result with an updated schema.
+            {t('results.label.outdatedSchema', {
+              resultVersion: result.rubric_version,
+              latestVersion: currentViewedRubric.version,
+            })}
           </div>
         )}
 

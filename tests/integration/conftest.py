@@ -10,7 +10,7 @@ from tests.integration.fixtures.database import (
     test_collection_id,
     test_user,
 )
-from tests.integration.fixtures.http_client import authed_client
+from tests.integration.fixtures.http_client import authed_client, client
 
 __all__ = [
     "db_engine",
@@ -21,6 +21,7 @@ __all__ = [
     "test_collection_id",
     "test_user",
     "charts_service",
+    "client",
     "authed_client",
     "override_db",
     "redis_client",

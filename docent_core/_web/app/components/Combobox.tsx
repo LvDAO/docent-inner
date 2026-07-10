@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/popover';
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useLocale } from '@/app/contexts/LocaleContext';
 
 export type ComboboxOption = {
   value: string;
@@ -65,9 +66,9 @@ export const Combobox = ({
   value,
   onChange,
   options,
-  placeholder = 'Select option',
-  searchPlaceholder = 'Search...',
-  emptyMessage = 'No results found.',
+  placeholder,
+  searchPlaceholder,
+  emptyMessage,
   triggerProps,
   triggerClassName,
   valueClassName,
@@ -86,9 +87,14 @@ export const Combobox = ({
   open,
   onOpenChange,
 }: ComboboxProps) => {
+  const { t } = useLocale();
   const [internalOpen, setInternalOpen] = useState(false);
   const isControlled = open !== undefined;
   const isOpen = isControlled ? Boolean(open) : internalOpen;
+  const resolvedPlaceholder = placeholder ?? t('misc.combobox.selectOption');
+  const resolvedSearchPlaceholder =
+    searchPlaceholder ?? t('misc.combobox.search');
+  const resolvedEmptyMessage = emptyMessage ?? t('misc.combobox.empty');
 
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
@@ -117,8 +123,8 @@ export const Combobox = ({
     if (renderValue) {
       return renderValue(selectedOption);
     }
-    return selectedOption?.label ?? placeholder;
-  }, [placeholder, renderValue, selectedOption]);
+    return selectedOption?.label ?? resolvedPlaceholder;
+  }, [renderValue, resolvedPlaceholder, selectedOption]);
 
   const handleSelect = useCallback(
     (nextValue: string) => {
@@ -164,12 +170,12 @@ export const Combobox = ({
       >
         <Command>
           <CommandInput
-            placeholder={searchPlaceholder}
+            placeholder={resolvedSearchPlaceholder}
             className={cn('h-8 text-xs', commandInputClassName)}
           />
           <CommandList className={cn('custom-scrollbar', commandListClassName)}>
             <CommandEmpty>
-              <span className="text-xs">{emptyMessage}</span>
+              <span className="text-xs">{resolvedEmptyMessage}</span>
             </CommandEmpty>
             <CommandGroup>
               {options.map((option) => {

@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { useGetFieldValuesQuery } from '../api/collectionApi';
 import { useDebounce } from '../../hooks/use-debounce';
+import { useLocale } from '../contexts/LocaleContext';
 
 // Styling constants for easy maintenance
 const DROPDOWN_STYLES = {
@@ -72,12 +73,13 @@ export const SmartValueInput = React.forwardRef<
       value,
       onValueChange,
       onEnter,
-      placeholder = 'Enter value...',
+      placeholder,
       className,
       type = 'text',
     },
     ref
   ) => {
+    const { t } = useLocale();
     const [open, setOpen] = useState(false);
     const [inputValue, setInputValue] = useState(value);
     const [dropdownPosition, setDropdownPosition] = useState({
@@ -383,7 +385,7 @@ export const SmartValueInput = React.forwardRef<
           onChange={handleInputChange}
           onFocus={handleInputFocus}
           onBlur={handleInputBlur}
-          placeholder={placeholder}
+          placeholder={placeholder ?? t('charts.filter.enterValueEllipsis')}
           type={type}
           className={cn(
             'h-7 text-xs bg-background font-mono text-muted-foreground hover:bg-secondary hover:text-primary',
@@ -423,10 +425,10 @@ export const SmartValueInput = React.forwardRef<
                     return (
                       <div className="px-2 py-2 text-xs text-muted-foreground text-center">
                         {isFieldChanging
-                          ? 'Loading values...'
+                          ? t('charts.filter.loadingValues')
                           : inputValue !== debouncedSearch
-                            ? 'Searching...'
-                            : 'Loading values...'}
+                            ? t('charts.filter.searching')
+                            : t('charts.filter.loadingValues')}
                       </div>
                     );
                   }
@@ -439,8 +441,8 @@ export const SmartValueInput = React.forwardRef<
                         {isSearching && !isFieldChanging && (
                           <div className="absolute -top-6 left-0 right-0 px-2 py-1 text-xs text-muted-foreground text-center bg-background border border-border rounded-t-md shadow-sm">
                             {inputValue !== debouncedSearch
-                              ? 'Searching...'
-                              : 'Loading...'}
+                              ? t('charts.filter.searching')
+                              : t('charts.filter.loading')}
                           </div>
                         )}
 
@@ -469,7 +471,7 @@ export const SmartValueInput = React.forwardRef<
 
                   return (
                     <div className="px-2 py-2 text-xs text-muted-foreground text-center">
-                      No matches found
+                      {t('charts.filter.noMatches')}
                     </div>
                   );
                 })()}

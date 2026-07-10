@@ -54,6 +54,7 @@ import { cn } from '@/lib/utils';
 import { useDebounce } from '@/hooks/use-debounce';
 import { Combobox } from './Combobox';
 import { useParams } from 'next/navigation';
+import { useLocale } from '../contexts/LocaleContext';
 
 export type AgentRunTableRow = {
   agentRunId: string;
@@ -196,7 +197,16 @@ function SortToggle({
   currentSortDirection: 'asc' | 'desc';
   onSortChange: (field: string | null, direction: 'asc' | 'desc') => void;
 }) {
+  const { t } = useLocale();
   const isActive = currentSortField === columnKey;
+
+  const sortLabel = !sortable
+    ? label
+    : !isActive
+      ? t('workspace.table.sortAscending', { field: label })
+      : currentSortDirection === 'asc'
+        ? t('workspace.table.sortDescending', { field: label })
+        : t('workspace.table.clearSort', { field: label });
 
   const handleClick = useCallback(() => {
     if (!sortable) {
@@ -222,6 +232,8 @@ function SortToggle({
         sortable ? 'hover:text-primary' : 'cursor-default'
       )}
       aria-pressed={isActive}
+      aria-label={sortLabel}
+      title={sortLabel}
       disabled={!sortable}
     >
       <span>{label}</span>
@@ -263,6 +275,7 @@ export const AgentRunTable = memo(function AgentRunTable({
   scrollContainerRef,
   emptyState,
 }: AgentRunTableProps) {
+  const { locale, t } = useLocale();
   const internalScrollRef = useRef<HTMLDivElement | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [containerHeight, setContainerHeight] = useState(0);
@@ -330,7 +343,7 @@ export const AgentRunTable = memo(function AgentRunTable({
       header: () => (
         <SortToggle
           columnKey="agent_run_id"
-          label="Agent Run"
+          label={t('workspace.table.agentRun')}
           sortable={true}
           currentSortField={sortField}
           currentSortDirection={sortDirection}
@@ -378,8 +391,7 @@ export const AgentRunTable = memo(function AgentRunTable({
           if (columnKey.startsWith('metadata.')) {
             // For metadata columns, try to access from the structured metadata first
             const structured = processedData?._structured as
-              | Record<string, unknown>
-              | undefined;
+              Record<string, unknown> | undefined;
             if (
               structured?.metadata &&
               typeof structured.metadata === 'object'
@@ -404,7 +416,7 @@ export const AgentRunTable = memo(function AgentRunTable({
             if (isNaN(date.getTime())) {
               return <span className="text-xs text-muted-foreground">-</span>;
             }
-            const formattedDate = date.toLocaleString('en-US', {
+            const formattedDate = date.toLocaleString(locale, {
               year: 'numeric',
               month: '2-digit',
               day: '2-digit',
@@ -436,11 +448,13 @@ export const AgentRunTable = memo(function AgentRunTable({
     return [baseColumn, ...metadataColumns];
   }, [
     metadataData,
+    locale,
     onSortChange,
     selectedColumns,
     sortDirection,
     sortField,
     sortableColumns,
+    t,
   ]);
 
   const table = useReactTable({
@@ -576,13 +590,13 @@ export const AgentRunTable = memo(function AgentRunTable({
   // Prepare sortable fields for the select
   const sortOptions = useMemo(
     () => [
-      { value: 'none', label: 'No sorting' },
+      { value: 'none', label: t('workspace.table.noSorting') },
       ...Array.from(sortableColumns).map((field) => ({
         value: field,
         label: field,
       })),
     ],
-    [sortableColumns]
+    [sortableColumns, t]
   );
 
   return (
@@ -595,9 +609,9 @@ export const AgentRunTable = memo(function AgentRunTable({
             value={sortField ?? 'none'}
             onChange={handleFieldChange}
             options={sortOptions}
-            placeholder="Select field"
-            searchPlaceholder="Search fields..."
-            emptyMessage="No field found."
+            placeholder={t('workspace.table.selectField')}
+            searchPlaceholder={t('workspace.table.searchFields')}
+            emptyMessage={t('workspace.table.noField')}
             triggerClassName="bg-background font-mono text-muted-foreground max-w-lg justify-between"
             valueClassName="truncate flex-1 min-w-0 text-left"
             commandInputClassName="h-8 text-xs"
@@ -606,7 +620,9 @@ export const AgentRunTable = memo(function AgentRunTable({
             popoverClassName="w-64"
             popoverAlign="start"
             renderValue={(selected) =>
-              sortField ? (selected?.label ?? sortField) : 'Select field'
+              sortField
+                ? (selected?.label ?? sortField)
+                : t('workspace.table.selectField')
             }
           />
 
@@ -615,9 +631,21 @@ export const AgentRunTable = memo(function AgentRunTable({
               variant="outline"
               size="sm"
               onClick={handleDirectionChange}
+              aria-label={
+                sortDirection === 'asc'
+                  ? t('workspace.table.changeDirectionAscending')
+                  : t('workspace.table.changeDirectionDescending')
+              }
+              title={
+                sortDirection === 'asc'
+                  ? t('workspace.table.changeDirectionAscending')
+                  : t('workspace.table.changeDirectionDescending')
+              }
               className="h-7 text-xs bg-background font-mono text-muted-foreground border-border hover:bg-muted-foreground/10 flex items-center gap-1 px-2 w-16"
             >
-              {sortDirection === 'asc' ? 'asc' : 'desc'}
+              {sortDirection === 'asc'
+                ? t('workspace.table.ascendingShort')
+                : t('workspace.table.descendingShort')}
               {sortDirection === 'asc' ? (
                 <ArrowUp className="h-3 w-3" />
               ) : (
@@ -636,29 +664,29 @@ export const AgentRunTable = memo(function AgentRunTable({
               className="h-7 gap-1 text-xs text-muted-foreground"
             >
               <Columns3 className="h-3 w-3" />
-              Columns
+              {t('workspace.table.columns')}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-72 p-0" align="end">
             <Command>
               <CommandInput
-                placeholder="Search columns..."
+                placeholder={t('workspace.table.searchColumns')}
                 className="h-8 text-xs"
               />
               <CommandList>
-                <CommandEmpty>No columns found.</CommandEmpty>
+                <CommandEmpty>{t('workspace.table.noColumns')}</CommandEmpty>
                 <CommandGroup>
                   <CommandItem
                     onSelect={() => handleSelectAll()}
                     className="text-xs text-muted-foreground"
                   >
-                    Select all
+                    {t('workspace.table.selectAll')}
                   </CommandItem>
                   <CommandItem
                     onSelect={() => handleClearAll()}
                     className="text-xs text-muted-foreground"
                   >
-                    Clear all
+                    {t('workspace.table.clearAll')}
                   </CommandItem>
                 </CommandGroup>
                 <CommandGroup>
@@ -802,10 +830,12 @@ export const AgentRunTable = memo(function AgentRunTable({
                   : 'bg-blue-100 bg-opacity-80 border-blue-text border-dashed'
               )}
               style={{ pointerEvents: 'none' }}
+              role="status"
+              aria-live="polite"
             >
               <Upload className="h-8 w-8 text-blue-text" />
               <div className="mt-2 text-sm font-medium transition-all duration-200 text-blue-text">
-                Drop Inspect logs to upload
+                {t('workspace.table.dropLogs')}
               </div>
             </div>
           )}

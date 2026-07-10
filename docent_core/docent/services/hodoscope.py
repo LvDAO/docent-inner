@@ -12,6 +12,12 @@ from sqlalchemy import Select, and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from docent_core._env_util import ENV
+from docent_core._llm_util.localization import (
+    DEFAULT_LOCALE,
+    SupportedLocale,
+    get_user_preferred_locale,
+    normalize_locale,
+)
 from docent_core._llm_util.providers.openai import (
     DEFAULT_EMBEDDING_DIMENSIONS,
     DEFAULT_EMBEDDING_MODEL,
@@ -624,7 +630,12 @@ def merge_hodoscope_tag_overlay(
     return _set_hodoscope_tag_counts(merged)
 
 
-def build_hodoscope_rubric_tag_query(collection_id: str, agent_run_ids: list[str]) -> Select[Any]:
+def build_hodoscope_rubric_tag_query(
+    collection_id: str,
+    agent_run_ids: list[str],
+    *,
+    locale: SupportedLocale,
+) -> Select[Any]:
     """Build the read-only latest-rubric centroid overlay query."""
 
     latest_versions = (
@@ -678,6 +689,8 @@ def build_hodoscope_rubric_tag_query(collection_id: str, agent_run_ids: list[str
             SQLAAgentRun.collection_id == collection_id,
             SQLAAgentRun.id.in_(agent_run_ids),
             SQLARubricCentroid.collection_id == collection_id,
+            SQLAJudgeResult.locale == locale,
+            SQLARubricCentroid.locale == locale,
             SQLAJudgeResult.result_type == ResultType.DIRECT_RESULT,
             SQLARubricCentroid.result_type == ResultType.DIRECT_RESULT,
             SQLAJudgeResultCentroid.result_type == ResultType.DIRECT_RESULT,
@@ -812,6 +825,7 @@ class HodoscopeAnalysisConfig(BaseModel):
     seed: int = 42
     projection_method: HodoscopeProjectionMethod = "tsne"
     summary_model: str = "docent-provider-preferences"
+    locale: SupportedLocale = DEFAULT_LOCALE
     embedding_model: str = Field(default_factory=get_hodoscope_embedding_model)
     embedding_dimensionality: int | None = Field(
         default_factory=get_hodoscope_embedding_dimensionality
@@ -934,20 +948,43 @@ class HodoscopeService:
         row = result.mappings().one_or_none()
         return self._summary_from_mapping(row) if row else None
 
-    async def list_analyses(self, ctx: ViewContext) -> list[HodoscopeAnalysisSummary]:
+    async def list_analyses(
+        self,
+        ctx: ViewContext,
+        locale: SupportedLocale | None = None,
+    ) -> list[HodoscopeAnalysisSummary]:
+        resolved_locale = (
+            normalize_locale(locale) if locale is not None else get_user_preferred_locale(ctx.user)
+        )
         result = await self.session.execute(
             select(*self._summary_columns())
-            .where(SQLAHodoscopeAnalysis.collection_id == ctx.collection_id)
+            .where(
+                SQLAHodoscopeAnalysis.collection_id == ctx.collection_id,
+                func.coalesce(
+                    SQLAHodoscopeAnalysis.config_json["locale"].astext,
+                    DEFAULT_LOCALE,
+                )
+                == resolved_locale,
+            )
             .order_by(SQLAHodoscopeAnalysis.created_at.desc())
         )
         return [self._summary_from_mapping(row) for row in result.mappings().all()]
 
-    async def get_active_analysis(self, ctx: ViewContext) -> SQLAHodoscopeAnalysis | None:
+    async def get_active_analysis(
+        self,
+        ctx: ViewContext,
+        locale: SupportedLocale,
+    ) -> SQLAHodoscopeAnalysis | None:
         result = await self.session.execute(
             select(SQLAHodoscopeAnalysis)
             .where(
                 SQLAHodoscopeAnalysis.collection_id == ctx.collection_id,
                 SQLAHodoscopeAnalysis.status.in_(["pending", "running"]),
+                func.coalesce(
+                    SQLAHodoscopeAnalysis.config_json["locale"].astext,
+                    DEFAULT_LOCALE,
+                )
+                == locale,
             )
             .order_by(SQLAHodoscopeAnalysis.created_at.desc())
             .limit(1)
@@ -957,13 +994,19 @@ class HodoscopeService:
     async def start_or_get_analysis(
         self, ctx: ViewContext, config: HodoscopeAnalysisConfig
     ) -> HodoscopeAnalysisSummary:
-        sq_active = await self.get_active_analysis(ctx)
+        locale = (
+            config.locale
+            if "locale" in config.model_fields_set
+            else get_user_preferred_locale(ctx.user)
+        )
+        sq_active = await self.get_active_analysis(ctx, locale)
         if sq_active is not None:
             return self._summary_from_sqla(sq_active)
 
         analysis_id = str(uuid4())
         job_id = str(uuid4())
         now = self._now()
+        config = config.model_copy(update={"locale": locale})
         config_json = config.model_dump()
         config_json["_job_state"] = {"stage": "pending", "progress": 0}
         sq_analysis = SQLAHodoscopeAnalysis(
@@ -989,6 +1032,7 @@ class HodoscopeService:
                 "analysis_id": analysis_id,
                 "stage": "pending",
                 "progress": 0,
+                "locale": locale,
             },
             status=JobStatus.PENDING,
         )
@@ -1005,6 +1049,7 @@ class HodoscopeService:
         projection: dict[str, Any],
         *,
         collection_id: str,
+        locale: SupportedLocale,
         tag_by: str | None,
         include_rubric_tags: bool,
     ) -> dict[str, Any]:
@@ -1040,7 +1085,11 @@ class HodoscopeService:
 
         if include_rubric_tags:
             rubric_result = await self.session.execute(
-                build_hodoscope_rubric_tag_query(collection_id, agent_run_ids)
+                build_hodoscope_rubric_tag_query(
+                    collection_id,
+                    agent_run_ids,
+                    locale=locale,
+                )
             )
             rubric_rows = cast(Sequence[Mapping[str, Any]], rubric_result.mappings().all())
             tag_catalog, tag_ids_by_trajectory = build_hodoscope_rubric_tag_overlay(rubric_rows)
@@ -1094,6 +1143,7 @@ class HodoscopeService:
         columns = [SQLAHodoscopeAnalysis.projection_json]
         if not compact:
             columns.append(SQLAHodoscopeAnalysis.artifact_json)
+        columns.append(SQLAHodoscopeAnalysis.config_json)
         result = await self.session.execute(
             select(*columns).where(
                 SQLAHodoscopeAnalysis.collection_id == ctx.collection_id,
@@ -1104,11 +1154,14 @@ class HodoscopeService:
         if row is None or row[0] is None:
             return None
         projection = cast(dict[str, Any], row[0])
+        config_json = cast(dict[str, Any], row[-1]) if isinstance(row[-1], dict) else {}
+        locale = normalize_locale(config_json.get("locale", DEFAULT_LOCALE))
         if compact:
             compact_projection = build_hodoscope_projection_view(projection)
             return await self._enrich_projection_tags(
                 compact_projection,
                 collection_id=ctx.collection_id,
+                locale=locale,
                 tag_by=tag_by,
                 include_rubric_tags=include_rubric_tags,
             )
@@ -1119,6 +1172,7 @@ class HodoscopeService:
         compact_projection = await self._enrich_projection_tags(
             build_hodoscope_projection_view(full_projection),
             collection_id=ctx.collection_id,
+            locale=locale,
             tag_by=tag_by,
             include_rubric_tags=include_rubric_tags,
         )
@@ -1144,7 +1198,7 @@ class HodoscopeService:
             sq_analysis.status = "canceled"
             sq_analysis.completed_at = self._now()
             sq_analysis.updated_at = self._now()
-            sq_analysis.error = "Canceled by user"
+            sq_analysis.error = None
             config_json = dict(sq_analysis.config_json)
             config_json["_job_state"] = {"stage": "canceled", "progress": 0}
             sq_analysis.config_json = config_json

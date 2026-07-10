@@ -214,8 +214,8 @@ async def test_hodoscope_service_keeps_legacy_full_projection_and_artifact_avail
     session = SimpleNamespace(
         execute=AsyncMock(
             side_effect=[
-                SimpleNamespace(one_or_none=lambda: (stored_projection, full_artifact)),
-                SimpleNamespace(one_or_none=lambda: (stored_projection,)),
+                SimpleNamespace(one_or_none=lambda: (stored_projection, full_artifact, {})),
+                SimpleNamespace(one_or_none=lambda: (stored_projection, {})),
                 SimpleNamespace(scalar_one_or_none=lambda: full_artifact),
             ]
         )
@@ -241,6 +241,31 @@ async def test_hodoscope_service_keeps_legacy_full_projection_and_artifact_avail
 
 @pytest.mark.unit
 @pytest.mark.asyncio
+async def test_hodoscope_analysis_list_explicit_locale_overrides_user_preference():
+    session = SimpleNamespace(
+        execute=AsyncMock(
+            return_value=SimpleNamespace(
+                mappings=lambda: SimpleNamespace(all=lambda: []),
+            )
+        )
+    )
+    service = HodoscopeService(session=session)  # type: ignore[arg-type]
+    ctx = SimpleNamespace(
+        collection_id="collection-id",
+        user=SimpleNamespace(preferred_locale="en"),
+    )
+
+    assert await service.list_analyses(ctx, locale="zh-CN") == []  # type: ignore[arg-type]
+
+    statement = session.execute.await_args.args[0]
+    assert any(
+        getattr(criterion.right, "value", None) == "zh-CN"
+        for criterion in statement._where_criteria
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
 async def test_hodoscope_service_adds_metadata_and_latest_rubric_tags_at_read_time():
     stored_projection = _full_projection_fixture()
     rubric_row = {
@@ -255,7 +280,7 @@ async def test_hodoscope_service_adds_metadata_and_latest_rubric_tags_at_read_ti
     session = SimpleNamespace(
         execute=AsyncMock(
             side_effect=[
-                SimpleNamespace(one_or_none=lambda: (stored_projection,)),
+                SimpleNamespace(one_or_none=lambda: (stored_projection, {"locale": "zh-CN"})),
                 SimpleNamespace(all=lambda: [("run-a", {"custom_tag": "needs-review"})]),
                 SimpleNamespace(mappings=lambda: SimpleNamespace(all=lambda: [rubric_row])),
             ]
@@ -281,6 +306,52 @@ async def test_hodoscope_service_adds_metadata_and_latest_rubric_tags_at_read_ti
         "rubric_cluster",
     }
     assert {tag["count"] for tag in projection["tag_catalog"]} == {1}
+
+    rubric_statement = session.execute.await_args_list[2].args[0]
+    locale_predicates = {
+        criterion.left.table.name: criterion.right.value
+        for criterion in rubric_statement._where_criteria
+        if getattr(criterion.left, "name", None) == "locale"
+    }
+    assert locale_predicates == {
+        "judge_results": "zh-CN",
+        "rubric_centroids": "zh-CN",
+    }
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_hodoscope_rubric_tags_default_legacy_analysis_locale_to_english():
+    stored_projection = _full_projection_fixture()
+    session = SimpleNamespace(
+        execute=AsyncMock(
+            side_effect=[
+                SimpleNamespace(one_or_none=lambda: (stored_projection, {})),
+                SimpleNamespace(mappings=lambda: SimpleNamespace(all=lambda: [])),
+            ]
+        )
+    )
+    service = HodoscopeService(session=session)  # type: ignore[arg-type]
+    ctx = SimpleNamespace(collection_id="collection-id")
+
+    projection = await service.get_projection(  # type: ignore[arg-type]
+        ctx,
+        "analysis-id",
+        compact=True,
+        include_rubric_tags=True,
+    )
+
+    assert projection is not None
+    rubric_statement = session.execute.await_args_list[1].args[0]
+    locale_predicates = {
+        criterion.left.table.name: criterion.right.value
+        for criterion in rubric_statement._where_criteria
+        if getattr(criterion.left, "name", None) == "locale"
+    }
+    assert locale_predicates == {
+        "judge_results": "en",
+        "rubric_centroids": "en",
+    }
 
 
 @pytest.mark.unit

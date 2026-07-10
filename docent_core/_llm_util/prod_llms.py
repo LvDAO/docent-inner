@@ -37,6 +37,12 @@ from docent_core._llm_util.data_models.llm_output import (
     LLMOutput,
 )
 from docent_core._llm_util.llm_cache import LLMCache
+from docent_core._llm_util.localization import (
+    SupportedLocale,
+    get_response_locale,
+    localize_messages,
+    normalize_locale,
+)
 from docent_core._llm_util.providers.preferences import ModelOption
 from docent_core._llm_util.providers.registry import (
     PROVIDERS,
@@ -55,11 +61,13 @@ class MessageResolver(Protocol):
 MessagesInput = Sequence[ChatMessage | dict[str, Any]] | MessageResolver
 
 
-def _resolve_messages_input(messages_input: MessagesInput) -> list[ChatMessage]:
+def _resolve_messages_input(
+    messages_input: MessagesInput, response_locale: SupportedLocale
+) -> list[ChatMessage]:
     raw_messages = (
         messages_input() if isinstance(messages_input, MessageResolver) else messages_input
     )
-    return [parse_chat_message(msg) for msg in raw_messages]
+    return localize_messages([parse_chat_message(msg) for msg in raw_messages], response_locale)
 
 
 def _get_single_streaming_callback(
@@ -88,6 +96,7 @@ async def _parallelize_calls(
     logprobs: bool,
     top_logprobs: int | None,
     timeout: float,
+    response_locale: SupportedLocale,
     semaphore: AsyncContextManager[anyio.Semaphore] | None,
     # use_tqdm: bool,
     cache: LLMCache | None = None,
@@ -125,7 +134,7 @@ async def _parallelize_calls(
         async with semaphore or nullcontext():
             try:
                 # Delay resolving until now to take advantage of pipelining
-                messages = _resolve_messages_input(cur_input)
+                messages = _resolve_messages_input(cur_input, response_locale)
                 # Save resolved messages to avoid multiple resolutions
                 resolved_messages[i] = messages
 
@@ -280,6 +289,7 @@ class LLMManager:
         timeout: float = 5.0,
         streaming_callback: AsyncLLMOutputStreamingCallback | None = None,
         completion_callback: AsyncLLMOutputStreamingCallback | None = None,
+        response_locale: SupportedLocale = "en",
     ) -> list[LLMOutput]:
         while True:
             # Parse the current model option
@@ -316,6 +326,7 @@ class LLMManager:
                 logprobs=logprobs,
                 top_logprobs=top_logprobs,
                 timeout=timeout,
+                response_locale=response_locale,
                 semaphore=(
                     anyio.Semaphore(max_concurrency) if max_concurrency is not None else None
                 ),
@@ -370,6 +381,7 @@ async def get_llm_completions_async(
     completion_callback: AsyncLLMOutputStreamingCallback | None = None,
     use_cache: bool = False,
     api_key_overrides: dict[str, str] | None = None,
+    response_locale: SupportedLocale | None = None,
 ) -> list[LLMOutput]:
     # We don't support logprobs for Anthropic yet
     if logprobs:
@@ -386,6 +398,10 @@ async def get_llm_completions_async(
         use_cache=use_cache,
     )
 
+    resolved_response_locale = (
+        normalize_locale(response_locale) if response_locale is not None else get_response_locale()
+    )
+
     return await llm_manager.get_completions(
         inputs,
         tools=tools,
@@ -398,4 +414,5 @@ async def get_llm_completions_async(
         timeout=timeout,
         streaming_callback=streaming_callback,
         completion_callback=completion_callback,
+        response_locale=resolved_response_locale,
     )

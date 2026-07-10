@@ -4,6 +4,7 @@ import { Copy, Check } from 'lucide-react';
 import { BaseMetadata } from '@/app/types/transcriptTypes';
 import { computeIntervalsForJsonPattern } from '@/lib/citationMatch';
 import { SegmentedText } from '@/lib/SegmentedText';
+import { useLocale } from '@/app/contexts/LocaleContext';
 
 export const formatMetadataValue = (value: any): string => {
   if (value === null || value === undefined) return 'N/A';
@@ -21,6 +22,7 @@ const copyToClipboard = async (text: string): Promise<boolean> => {
 };
 
 const CopyButton: React.FC<{ value: any }> = ({ value }) => {
+  const { t } = useLocale();
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -36,7 +38,7 @@ const CopyButton: React.FC<{ value: any }> = ({ value }) => {
     <button
       onClick={handleCopy}
       className="ml-2 p-1 rounded hover:bg-muted transition-colors"
-      title="Copy to clipboard"
+      title={t('results.metadata.copyTitle')}
     >
       {copied ? (
         <Check className="h-3 w-3 text-green-text" />

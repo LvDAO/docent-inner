@@ -22,6 +22,7 @@ import { cn, copyToClipboard } from '@/lib/utils';
 
 import { useHasCollectionPermission } from '@/lib/permissions/hooks';
 import { useUpdateCollectionMutation } from '../api/collectionApi';
+import { useLocale } from '../contexts/LocaleContext';
 
 interface CollectionRowProps {
   collection: Collection;
@@ -38,6 +39,7 @@ export default function CollectionRow({
   onDelete,
 }: CollectionRowProps) {
   const router = useRouter();
+  const { locale, t } = useLocale();
   const hasAdminPermission = useHasCollectionPermission('admin', collection.id);
   const hasWritePermission = useHasCollectionPermission('write', collection.id);
 
@@ -70,13 +72,15 @@ export default function CollectionRow({
     const success = await copyToClipboard(collection.id);
     if (success) {
       toast({
-        title: 'Collection ID Copied',
-        description: `Copied ${collection.id} to clipboard`,
+        title: t('collections.idCopied'),
+        description: t('collections.idCopiedDescription', {
+          id: collection.id,
+        }),
       });
     } else {
       toast({
-        title: 'Failed to copy',
-        description: 'Could not copy to clipboard',
+        title: t('collections.copyFailed'),
+        description: t('collections.copyFailedDescription'),
         variant: 'destructive',
       });
     }
@@ -109,8 +113,8 @@ export default function CollectionRow({
     });
 
     toast({
-      title: 'Collection Updated',
-      description: 'The collection has been updated successfully',
+      title: t('collections.updated'),
+      description: t('collections.updatedDescription'),
     });
 
     setIsEditing(false);
@@ -127,7 +131,7 @@ export default function CollectionRow({
     // dateString is in UTC
     const date = new Date(dateString + 'Z');
     // display in local time
-    return date.toLocaleDateString('en-US', {
+    return date.toLocaleDateString(locale, {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -157,7 +161,7 @@ export default function CollectionRow({
             size="icon"
             className="h-5 w-5 ml-1"
             onClick={copyId}
-            title="Copy full ID"
+            title={t('collections.copyFullId')}
           >
             <ClipboardCopyIcon className="h-3 w-3 text-muted-foreground group-hover:text-blue-text" />
           </Button>
@@ -170,14 +174,16 @@ export default function CollectionRow({
           <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Enter collection name"
+            placeholder={t('collections.namePlaceholder')}
             className="h-7 text-xs py-0 px-2"
             onClick={(e) => e.stopPropagation()}
           />
         ) : (
           <span className="text-primary text-xs">
             {collection.name || (
-              <span className="italic text-secondary">Unnamed Collection</span>
+              <span className="italic text-secondary">
+                {t('collections.unnamed')}
+              </span>
             )}
           </span>
         )}
@@ -189,7 +195,7 @@ export default function CollectionRow({
           <Input
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Enter description"
+            placeholder={t('collections.descriptionPlaceholder')}
             className="h-7 text-xs py-0 px-2"
             onClick={(e) => e.stopPropagation()}
           />
@@ -197,7 +203,7 @@ export default function CollectionRow({
           <span className="text-xs text-muted-foreground">
             {collection.description || (
               <span className="italic text-muted-foreground">
-                No description provided
+                {t('collections.noDescriptionProvided')}
               </span>
             )}
           </span>
@@ -221,7 +227,7 @@ export default function CollectionRow({
               size="icon"
               className="h-7 w-7 text-green-foreground"
               onClick={saveChanges}
-              title="Save changes"
+              title={t('collections.saveChanges')}
             >
               <CheckIcon className="h-3.5 w-3.5" />
             </Button>
@@ -230,25 +236,13 @@ export default function CollectionRow({
               size="icon"
               className="h-7 w-7 text-muted-foreground"
               onClick={cancelEditing}
-              title="Cancel editing"
+              title={t('collections.cancelEditing')}
             >
               <XIcon className="h-3.5 w-3.5" />
             </Button>
           </div>
         ) : (
           <div className="flex items-center justify-end space-x-1">
-            {/* <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-secondary group-hover:text-accent-foreground"
-              onClick={(e) => {
-                e.stopPropagation();
-                openCollection();
-              }}
-              title="Open collection"
-            >
-              <ExternalLinkIcon className="h-3.5 w-3.5" />
-            </Button> */}
             {hasWritePermission ? (
               <div className="flex items-center gap-3">
                 <Button
@@ -257,7 +251,7 @@ export default function CollectionRow({
                   className="h-auto w-auto text-muted-foreground group-hover:text-blue-text p-0"
                   onClick={startEditing}
                   disabled={!hasWritePermission}
-                  title="Edit collection"
+                  title={t('collections.edit')}
                 >
                   <Pencil className="h-3.5 w-3.5" />
                 </Button>
@@ -267,13 +261,15 @@ export default function CollectionRow({
                   className="h-auto w-auto text-muted-foreground group-hover:text-red-text p-0"
                   disabled={!hasAdminPermission}
                   onClick={triggerDelete}
-                  title="Delete collection"
+                  title={t('collections.delete')}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
             ) : (
-              <div className="text-muted-foreground text-xs">Read only</div>
+              <div className="text-muted-foreground text-xs">
+                {t('collections.readOnly')}
+              </div>
             )}
           </div>
         )}

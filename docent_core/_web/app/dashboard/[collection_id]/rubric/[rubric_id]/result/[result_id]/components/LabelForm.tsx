@@ -10,8 +10,9 @@ import {
 import { JudgeRunLabel } from '@/app/store/rubricSlice';
 import { SchemaDefinition } from '@/app/types/schema';
 import { toast } from '@/hooks/use-toast';
-import posthog from 'posthog-js';
+import posthogClient from 'posthog-js';
 import { Check } from 'lucide-react';
+import { useLocale } from '@/app/contexts/LocaleContext';
 
 // Reducer types
 type FormState = Record<string, any>;
@@ -158,6 +159,7 @@ const LabelForm = ({
   initialState = {},
   judgeRunLabel,
 }: AreaProps) => {
+  const { t } = useLocale();
   // Plop the initial state into the reducer as the initial reducer state
   const [formState, dispatch] = useReducer(formReducer, initialState);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -188,14 +190,16 @@ const LabelForm = ({
         showSaveSuccess();
       }
 
-      posthog.capture('label_form_submitted', {
+      posthogClient.capture('label_form_submitted', {
         num_fields_filled: Object.keys(formState).length,
         agent_run_id: agentRunId,
       });
     } catch (error) {
       toast({
-        title: 'Error',
-        description: `Failed to ${judgeRunLabel ? 'update' : 'create'} label`,
+        title: t('results.error.title'),
+        description: judgeRunLabel
+          ? t('results.label.updateFailed')
+          : t('results.label.createFailed'),
         variant: 'destructive',
       });
     }
@@ -240,8 +244,8 @@ const LabelForm = ({
         );
       } catch (error) {
         toast({
-          title: 'Error',
-          description: 'Failed to delete label',
+          title: t('results.error.title'),
+          description: t('results.label.deleteFailed'),
           variant: 'destructive',
         });
       }
@@ -261,7 +265,7 @@ const LabelForm = ({
               </label>
               <TextInput
                 value={formState[key]?.text}
-                placeholder={'Enter an updated explanation.'}
+                placeholder={t('results.label.explanationPlaceholder')}
                 onChange={(value) =>
                   dispatch({ type: 'SET_EXPLANATION_TEXT', key, value })
                 }
@@ -336,7 +340,9 @@ const LabelForm = ({
       <div className="sticky bottom-0 bg-background pt-3 border-t">
         <div className="flex flex-row gap-2 w-full">
           <Button size="sm" onClick={submit} className="w-full relative">
-            <span className="pointer-events-none">Save</span>
+            <span className="pointer-events-none">
+              {t('results.label.save')}
+            </span>
             <Check
               aria-hidden
               className={cn(
@@ -352,7 +358,9 @@ const LabelForm = ({
             disabled={!hasChanged}
             className="w-full relative"
           >
-            <span className="pointer-events-none">Reset</span>
+            <span className="pointer-events-none">
+              {t('results.label.reset')}
+            </span>
             <Check
               aria-hidden
               className={cn(

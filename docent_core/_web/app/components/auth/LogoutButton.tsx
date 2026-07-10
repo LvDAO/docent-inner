@@ -3,17 +3,13 @@
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 
+import { useLocale } from '../../contexts/LocaleContext';
 import { logout } from '../../services/authService';
 import { useUserContext } from '../../contexts/UserContext';
 
 interface LogoutButtonProps {
   variant?:
-    | 'default'
-    | 'destructive'
-    | 'outline'
-    | 'secondary'
-    | 'ghost'
-    | 'link';
+    'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
   size?: 'default' | 'sm' | 'lg' | 'icon';
   className?: string;
 }
@@ -23,6 +19,7 @@ export const LogoutButton = ({
   size = 'default',
   className,
 }: LogoutButtonProps) => {
+  const { t } = useLocale();
   const { setUser } = useUserContext();
 
   const handleLogout = async () => {
@@ -31,8 +28,8 @@ export const LogoutButton = ({
       setUser(null); // Clear client state
 
       toast({
-        title: 'Success',
-        description: 'You have been logged out successfully.',
+        title: t('misc.auth.logoutSuccessTitle'),
+        description: t('misc.auth.logoutSuccessDescription'),
       });
 
       // Redirect to login
@@ -40,8 +37,8 @@ export const LogoutButton = ({
     } catch (error) {
       console.error('Logout failed:', error);
       toast({
-        title: 'Error',
-        description: 'There was an error logging out. Please try again.',
+        title: t('misc.auth.logoutErrorTitle'),
+        description: t('misc.auth.logoutErrorDescription'),
         variant: 'destructive',
       });
     }
@@ -54,7 +51,7 @@ export const LogoutButton = ({
       onClick={handleLogout}
       className={className}
     >
-      Log Out
+      {t('misc.auth.logout')}
     </Button>
   );
 };

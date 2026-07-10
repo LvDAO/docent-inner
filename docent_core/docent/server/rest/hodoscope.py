@@ -12,6 +12,7 @@ from docent_core.docent.services.hodoscope import (
     HodoscopeAnalysisSummary,
     HodoscopeService,
 )
+from docent_core.localization import SupportedLocale
 
 hodoscope_router = APIRouter()
 
@@ -30,11 +31,12 @@ async def start_hodoscope_analysis(
 @hodoscope_router.get("/{collection_id}/analyses")
 async def list_hodoscope_analyses(
     collection_id: str,
+    locale: SupportedLocale | None = None,
     hodoscope_svc: HodoscopeService = Depends(get_hodoscope_service),
     ctx: ViewContext = Depends(get_default_view_ctx),
     _: None = Depends(require_collection_permission(Permission.READ)),
 ) -> list[HodoscopeAnalysisSummary]:
-    return await hodoscope_svc.list_analyses(ctx)
+    return await hodoscope_svc.list_analyses(ctx, locale=locale)
 
 
 @hodoscope_router.get("/{collection_id}/analyses/{analysis_id}")

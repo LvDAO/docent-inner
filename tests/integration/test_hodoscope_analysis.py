@@ -82,5 +82,5 @@ async def test_hodoscope_analysis_endpoints_start_reuse_and_cancel(
     canceled = response.json()
     assert canceled["status"] == "canceled"
     assert canceled["stage"] == "canceled"
-    assert canceled["error"] == "Canceled by user"
+    assert canceled["error"] is None
     assert canceled_jobs == [started["job_id"]]

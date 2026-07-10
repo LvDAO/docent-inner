@@ -32,8 +32,10 @@ import {
 } from '../api/chartApi';
 import { ChartSpec } from '../types/collectionTypes';
 import { skipToken } from '@reduxjs/toolkit/query';
+import { useLocale } from '../contexts/LocaleContext';
 
 export function ChartsArea() {
+  const { t } = useLocale();
   const collectionId = useAppSelector((state) => state.collection.collectionId);
 
   const {
@@ -203,7 +205,7 @@ export function ChartsArea() {
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="flex flex-1 items-center justify-center p-4 text-sm text-red-500">
-          Error loading charts
+          {t('charts.area.errorLoading')}
         </div>
       </div>
     );
@@ -255,6 +257,8 @@ export function ChartsArea() {
                 e.stopPropagation();
                 removeTab(chart.id);
               }}
+              title={t('charts.area.remove')}
+              aria-label={t('charts.area.remove')}
             >
               <X className="h-3 w-3" />
             </button>
@@ -265,6 +269,8 @@ export function ChartsArea() {
         <button
           className="flex items-center justify-center p-1 ml-0 text-muted-foreground bg-muted rounded transition-colors self-center"
           onClick={addTab}
+          title={t('charts.area.add')}
+          aria-label={t('charts.area.add')}
         >
           <Plus className="h-3 w-3" />
         </button>
@@ -273,7 +279,8 @@ export function ChartsArea() {
         <button
           className="flex items-center justify-center p-1 ml-1 text-muted-foreground bg-muted rounded transition-colors self-center hover:bg-secondary hover:text-primary"
           onClick={handleRefresh}
-          title="Refresh charts and data"
+          title={t('charts.area.refresh')}
+          aria-label={t('charts.area.refresh')}
         >
           <RefreshCw className="h-3 w-3" />
         </button>

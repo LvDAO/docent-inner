@@ -1,7 +1,7 @@
-import { useGetRefinementSessionStateQuery } from '../api/refinementApi';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { skipToken } from '@reduxjs/toolkit/query';
 import {
+  useGetRefinementSessionStateQuery,
   usePostMessageToRefinementSessionMutation,
   useListenToRefinementJobQuery,
   useCancelRefinementJobMutation,
@@ -12,7 +12,7 @@ import { ChatMessage } from '../types/transcriptTypes';
 import { useRubricVersion } from '@/providers/use-rubric-version';
 import { useRefinementTab } from '@/providers/use-refinement-tab';
 import { toast } from '@/hooks/use-toast';
-import { useAppDispatch } from '@/app/store/hooks';
+import { useLocale } from '@/app/contexts/LocaleContext';
 
 interface UseRefinementChatOptions {
   collectionId: string;
@@ -33,10 +33,9 @@ interface UseRefinementChatReturn {
 const useRefinementChat = ({
   collectionId,
   sessionId,
-  rubricId,
   showLabelsInContext,
 }: UseRefinementChatOptions): UseRefinementChatReturn => {
-  const dispatch = useAppDispatch();
+  const { t } = useLocale();
   const { refinementJobId, setRefinementJobId } = useRefinementTab();
   const { refetchLatestVersion } = useRubricVersion();
 
@@ -89,12 +88,12 @@ const useRefinementChat = ({
       .unwrap()
       .catch(() => {
         toast({
-          title: 'Error',
-          description: 'Failed to cancel refinement session',
+          title: t('common.error'),
+          description: t('chat.refinement.cancelFailed'),
           variant: 'destructive',
         });
       });
-  }, [collectionId, sessionId, cancelRefinementSession, setRefinementJobId]);
+  }, [collectionId, sessionId, cancelRefinementSession, setRefinementJobId, t]);
 
   // Start listening to the job state via SSE when we have a jobId
   const {

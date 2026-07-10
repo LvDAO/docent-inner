@@ -13,8 +13,10 @@ import { useCitationNavigation } from '../../NavigateToCitationContext';
 import { Loader2 } from 'lucide-react';
 import { useRubricVersion } from '@/providers/use-rubric-version';
 import { useRefinementTab } from '@/providers/use-refinement-tab';
+import { useLocale } from '@/app/contexts/LocaleContext';
 
 export default function JudgeResultPage() {
+  const { t } = useLocale();
   const {
     result_id: resultId,
     collection_id: collectionId,
@@ -134,7 +136,11 @@ export default function JudgeResultPage() {
 
   if (isLoadingRubricRunState) {
     return (
-      <div className="flex-1 flex items-center justify-center min-h-0 h-full">
+      <div
+        className="flex-1 flex items-center justify-center min-h-0 h-full"
+        role="status"
+        aria-label={t('misc.result.loadingRubricRunState')}
+      >
         <Loader2 size={16} className="animate-spin text-muted-foreground" />
       </div>
     );
@@ -143,7 +149,7 @@ export default function JudgeResultPage() {
   if (isErrorRubricRunState || !rubricRunState) {
     return (
       <div className="flex-1 flex items-center text-xs text-muted-foreground justify-center min-h-0 h-full">
-        Failed to load rubric run state.
+        {t('misc.result.failedRubricRunState')}
       </div>
     );
   }
@@ -151,9 +157,9 @@ export default function JudgeResultPage() {
   let agentRunViewerContent = null;
   if (agentRunId) {
     if (isLoadingRubricRunState) {
-      agentRunViewerContent = <div>Loading agent run...</div>;
+      agentRunViewerContent = <div>{t('misc.result.loadingAgentRun')}</div>;
     } else if (isErrorRubricRunState) {
-      agentRunViewerContent = <div>Failed to load agent run.</div>;
+      agentRunViewerContent = <div>{t('misc.result.failedAgentRun')}</div>;
     } else if (rubricRunState) {
       agentRunViewerContent = (
         <div className="h-full border rounded-xl p-3 overflow-hidden flex flex-col space-y-2">

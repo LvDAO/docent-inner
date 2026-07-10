@@ -18,7 +18,8 @@ from docent.data_models.chat.message import (
     UserMessage,
 )
 from docent_core._llm_util.data_models.llm_output import LLMOutput
-from docent_core._llm_util.prod_llms import get_llm_completions_async
+from docent_core._llm_util.localization import get_user_preferred_locale
+from docent_core._llm_util.prod_llms import MessagesInput, get_llm_completions_async
 from docent_core._llm_util.providers.preferences import PROVIDER_PREFERENCES
 from docent_core._server._broker.redis_client import (
     STATE_KEY_FORMAT,
@@ -29,14 +30,13 @@ from docent_core._server._broker.redis_client import (
 from docent_core._worker.constants import WorkerFunction
 from docent_core.docent.ai_tools.rubric.refine import (
     DIRECT_SEARCH_SYS_PROMPT,
-    DIRECT_SEARCH_WELCOME_MESSAGE,
     FIRST_USER_MESSAGE_TEMPLATE,
     GUIDED_SEARCH_SYS_PROMPT,
-    GUIDED_SEARCH_WELCOME_MESSAGE,
     RUN_SUMMARY_TEMPLATE,
     SummaryStreamingCallback,
     create_set_rubric_and_schema_tool,
     execute_set_rubric,
+    get_refinement_welcome_message,
     summarize_agent_runs,
     update_user_message_with_labels,
 )
@@ -275,6 +275,7 @@ class RefinementService:
                     job_json={
                         "rsession_id": sq_rsession.id,
                         "show_labels_in_context": show_labels_in_context,
+                        "locale": get_user_preferred_locale(ctx.user),
                     },
                 )
             )
@@ -450,9 +451,7 @@ class RefinementService:
                 is_guided = GUIDED_SEARCH_SYS_PROMPT == last_message.content
 
                 # Add a welcome message and notify sse_callback
-                welcome_message = (
-                    GUIDED_SEARCH_WELCOME_MESSAGE if is_guided else DIRECT_SEARCH_WELCOME_MESSAGE
-                )
+                welcome_message = get_refinement_welcome_message(is_guided=is_guided)
                 rsession.messages.append(AssistantMessage(content=welcome_message))
                 if sse_callback:
                     await sse_callback(rsession.prepare_for_client())
@@ -484,7 +483,7 @@ class RefinementService:
                     messages = messages[:-1] + [user_message]
 
                 outputs = await get_llm_completions_async(
-                    [messages],
+                    [cast(MessagesInput, messages)],
                     PROVIDER_PREFERENCES.refine_agent,
                     tools=[
                         create_set_rubric_and_schema_tool(),

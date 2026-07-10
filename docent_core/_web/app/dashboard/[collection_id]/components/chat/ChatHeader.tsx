@@ -2,6 +2,7 @@
 
 import { Button } from '@/components/ui/button';
 import { RotateCcw } from 'lucide-react';
+import { useLocale } from '@/app/contexts/LocaleContext';
 
 interface ChatHeaderProps {
   title?: string;
@@ -12,18 +13,24 @@ interface ChatHeaderProps {
 }
 
 export function ChatHeader({
-  title = 'Chat',
-  description = 'Ask questions about the transcript',
+  title,
+  description,
   onReset,
   canReset = true,
   children,
 }: ChatHeaderProps) {
+  const { t } = useLocale();
+  const shownTitle = title ?? t('chat.header.title');
+  const shownDescription = description ?? t('chat.header.description');
+
   return (
     <div className="flex items-center justify-between">
       <div className="flex flex-col gap-1">
-        <h4 className="font-semibold text-sm">{title}</h4>
-        {description && (
-          <span className="text-xs text-muted-foreground">{description}</span>
+        <h4 className="font-semibold text-sm">{shownTitle}</h4>
+        {shownDescription && (
+          <span className="text-xs text-muted-foreground">
+            {shownDescription}
+          </span>
         )}
       </div>
       <div className="flex items-center gap-2">
@@ -35,7 +42,7 @@ export function ChatHeader({
             onClick={onReset}
             disabled={!canReset}
             className="h-7 w-7 p-1.5 text-xs"
-            title="Clear chat history"
+            title={t('chat.header.clearHistory')}
           >
             <RotateCcw className="h-4 w-4" />
           </Button>

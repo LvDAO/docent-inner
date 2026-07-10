@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils';
 import { useGetJudgeRunLabelsQuery } from '@/app/api/rubricApi';
 import { useRetryLastMessageMutation } from '@/app/api/refinementApi';
 import { useRefinementTab } from '@/providers/use-refinement-tab';
+import { useLocale } from '@/app/contexts/LocaleContext';
 
 interface RefinementChatProps {
   collectionId: string;
@@ -31,6 +32,7 @@ export default function RefinementChat({
   rubricId,
   isOnResultRoute,
 }: RefinementChatProps) {
+  const { t } = useLocale();
   const hasWritePermission = useHasCollectionWritePermission();
   const [showLabelsInContext, setShowLabelsInContext] = useState(true);
   const { setRefinementJobId } = useRefinementTab();
@@ -87,14 +89,14 @@ export default function RefinementChat({
             <Tags
               className={cn('size-3', showLabelsInContext && 'text-blue-text')}
             />
-            Labels
+            {t('chat.refinement.labels')}
           </Button>
         </TooltipTrigger>
         <TooltipContent className="max-w-48 text-center">
           <p>
             {hasLabels
-              ? 'Toggle whether the agent sees labels in context.'
-              : 'No labels found.'}
+              ? t('chat.refinement.toggleLabels')
+              : t('chat.refinement.noLabels')}
           </p>
         </TooltipContent>
       </Tooltip>
@@ -111,8 +113,8 @@ export default function RefinementChat({
       })
       .catch(() => {
         toast({
-          title: 'Error',
-          description: 'Failed to retry last message',
+          title: t('common.error'),
+          description: t('chat.refinement.retryFailed'),
           variant: 'destructive',
         });
       });
@@ -147,9 +149,11 @@ export default function RefinementChat({
         inputAreaFooter={undefined}
         headerElement={
           <div className="flex flex-col">
-            <div className="text-sm font-semibold">Refinement Chat</div>
+            <div className="text-sm font-semibold">
+              {t('chat.refinement.title')}
+            </div>
             <div className="text-xs text-muted-foreground">
-              Chat with an agent to refine the rubric (⌘J)
+              {t('chat.refinement.description')}
             </div>
           </div>
         }

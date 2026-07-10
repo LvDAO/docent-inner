@@ -35,6 +35,7 @@ import {
   useStartHodoscopeAnalysisMutation,
 } from '../api/hodoscopeApi';
 import { useGetAgentRunMetadataFieldsQuery } from '../api/collectionApi';
+import { useLocale } from '../contexts/LocaleContext';
 import { useAppSelector } from '../store/hooks';
 import { HodoscopeEmbeddingMap } from './HodoscopeEmbeddingMap';
 
@@ -44,14 +45,6 @@ const DEFAULT_SEED = 42;
 const AUTO_GROUP = '__auto__';
 const NO_TAG_BY = '__none__';
 
-const statusLabel: Record<string, string> = {
-  pending: 'Pending',
-  running: 'Running',
-  complete: 'Complete',
-  error: 'Error',
-  canceled: 'Canceled',
-};
-
 export function HodoscopePanel({
   hasWritePermission,
 }: {
@@ -59,6 +52,26 @@ export function HodoscopePanel({
 }) {
   const collectionId = useAppSelector((state) => state.collection.collectionId);
   const router = useRouter();
+  const { locale, t } = useLocale();
+
+  const statusLabels: Record<string, string> = {
+    pending: t('analysis.hodoscope.pending'),
+    running: t('analysis.hodoscope.running'),
+    complete: t('analysis.hodoscope.complete'),
+    error: t('analysis.hodoscope.error'),
+    canceled: t('analysis.hodoscope.canceled'),
+  };
+  const stageLabels: Record<string, string> = {
+    pending: t('analysis.hodoscope.stage.pending'),
+    loading_runs: t('analysis.hodoscope.stage.loadingRuns'),
+    extracting_actions: t('analysis.hodoscope.stage.extractingActions'),
+    summarizing: t('analysis.hodoscope.stage.summarizing'),
+    embedding: t('analysis.hodoscope.stage.embedding'),
+    projecting: t('analysis.hodoscope.stage.projecting'),
+    complete: t('analysis.hodoscope.stage.complete'),
+    error: t('analysis.hodoscope.stage.error'),
+    canceled: t('analysis.hodoscope.stage.canceled'),
+  };
 
   const [groupBy, setGroupBy] = useState(AUTO_GROUP);
   const [tagBy, setTagBy] = useState(NO_TAG_BY);
@@ -78,7 +91,7 @@ export function HodoscopePanel({
     isFetching: isFetchingAnalyses,
     refetch: refetchAnalyses,
   } = useListHodoscopeAnalysesQuery(
-    collectionId ? { collectionId } : skipToken,
+    collectionId ? { collectionId, locale } : skipToken,
     {
       pollingInterval: 0,
     }
@@ -90,7 +103,7 @@ export function HodoscopePanel({
     latestAnalysis?.status === 'running';
 
   const { data: pollingAnalyses = [] } = useListHodoscopeAnalysesQuery(
-    collectionId && isActive ? { collectionId } : skipToken,
+    collectionId && isActive ? { collectionId, locale } : skipToken,
     {
       pollingInterval: 2000,
     }
@@ -107,6 +120,7 @@ export function HodoscopePanel({
         ? {
             collectionId,
             analysisId: currentAnalysis.id,
+            locale,
             tagBy: tagBy === NO_TAG_BY ? null : tagBy,
             includeRubricTags: true,
           }
@@ -144,7 +158,8 @@ export function HodoscopePanel({
     await startAnalysis({
       collectionId,
       config: {
-        name: 'Hodoscope analysis',
+        name: t('analysis.hodoscope.analysisName'),
+        locale,
         group_by: groupBy === AUTO_GROUP ? null : groupBy,
         limit,
         max_actions: maxActions,
@@ -220,7 +235,9 @@ export function HodoscopePanel({
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h2 className="text-sm font-semibold">Hodoscope Embedding</h2>
+                  <h2 className="text-sm font-semibold">
+                    {t('analysis.hodoscope.title')}
+                  </h2>
                   {currentAnalysis ? (
                     <Badge
                       variant={
@@ -230,17 +247,30 @@ export function HodoscopePanel({
                       }
                       className="h-5 rounded-full px-2 text-[10px]"
                     >
-                      {statusLabel[currentAnalysis.status] ??
+                      {statusLabels[currentAnalysis.status] ??
                         currentAnalysis.status}
                     </Badge>
                   ) : null}
                 </div>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   {projection
-                    ? `${projection.projection_method.toUpperCase()} · ${projection.points.length} actions · ${projection.groups.length} groups · ${projection.tag_catalog?.length ?? 0} tags`
+                    ? `${projection.projection_method.toUpperCase()} · ${t(
+                        'analysis.hodoscope.actionsAcrossGroups',
+                        {
+                          actions: projection.points.length,
+                          groups: projection.groups.length,
+                        }
+                      )} · ${t('analysis.hodoscope.tagsCount', {
+                        count: projection.tag_catalog?.length ?? 0,
+                      })}`
                     : currentAnalysis?.stage
-                      ? `${currentAnalysis.stage} · ${currentAnalysis.point_count} actions`
-                      : 'Explore behavioral neighborhoods across agent trajectories'}
+                      ? t('analysis.hodoscope.stagePoints', {
+                          stage:
+                            stageLabels[currentAnalysis.stage] ??
+                            currentAnalysis.stage,
+                          points: currentAnalysis.point_count,
+                        })
+                      : t('analysis.hodoscope.noMapData')}
                 </p>
               </div>
             </div>
@@ -249,17 +279,19 @@ export function HodoscopePanel({
           <div className="flex flex-wrap items-end gap-2">
             <div className="w-48">
               <Label className="text-[11px] text-muted-foreground">
-                Group by
+                {t('analysis.hodoscope.groupBy')}
               </Label>
               <Select value={groupBy} onValueChange={setGroupBy}>
                 <SelectTrigger
-                  aria-label="Group Hodoscope points by"
+                  aria-label={t('analysis.hodoscope.groupBy')}
                   className="mt-1 h-8 border-border/70 bg-background text-xs"
                 >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={AUTO_GROUP}>Auto detect model</SelectItem>
+                  <SelectItem value={AUTO_GROUP}>
+                    {t('analysis.hodoscope.autoDetectModel')}
+                  </SelectItem>
                   {fieldOptions.map((field) => (
                     <SelectItem key={field} value={field}>
                       {field}
@@ -271,18 +303,20 @@ export function HodoscopePanel({
 
             <div className="w-48">
               <Label className="text-[11px] text-muted-foreground">
-                Tag by
+                {t('analysis.hodoscope.tagBy')}
               </Label>
               <Select value={tagBy} onValueChange={setTagBy}>
                 <SelectTrigger
-                  aria-label="Add a metadata field as Hodoscope tags"
+                  aria-label={t('analysis.hodoscope.tagByAria')}
                   className="mt-1 h-8 border-border/70 bg-background text-xs"
-                  title="Adds view-time metadata tags without rerunning the analysis"
+                  title={t('analysis.hodoscope.tagByHelp')}
                 >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={NO_TAG_BY}>None</SelectItem>
+                  <SelectItem value={NO_TAG_BY}>
+                    {t('analysis.hodoscope.none')}
+                  </SelectItem>
                   {fieldOptions.map((field) => (
                     <SelectItem key={field} value={field}>
                       {field}
@@ -297,7 +331,7 @@ export function HodoscopePanel({
                 htmlFor="hodoscope-max-runs"
                 className="text-[11px] text-muted-foreground"
               >
-                Max runs
+                {t('analysis.hodoscope.maxRuns')}
               </Label>
               <Input
                 id="hodoscope-max-runs"
@@ -319,7 +353,7 @@ export function HodoscopePanel({
                 htmlFor="hodoscope-max-points"
                 className="text-[11px] text-muted-foreground"
               >
-                Max points
+                {t('analysis.hodoscope.maxPoints')}
               </Label>
               <Input
                 id="hodoscope-max-points"
@@ -341,7 +375,7 @@ export function HodoscopePanel({
 
             <div className="w-28">
               <Label className="text-[11px] text-muted-foreground">
-                Next projection
+                {t('analysis.hodoscope.projection')}
               </Label>
               <Select
                 value={projectionMethod}
@@ -350,7 +384,7 @@ export function HodoscopePanel({
                 }
               >
                 <SelectTrigger
-                  aria-label="Choose the next Hodoscope projection method"
+                  aria-label={t('analysis.hodoscope.projection')}
                   className="mt-1 h-8 border-border/70 bg-background text-xs"
                 >
                   <SelectValue />
@@ -378,7 +412,7 @@ export function HodoscopePanel({
                 ) : (
                   <Square className="mr-2 h-3.5 w-3.5" />
                 )}
-                Cancel
+                {t('common.cancel')}
               </Button>
             ) : (
               <Button
@@ -392,7 +426,7 @@ export function HodoscopePanel({
                 ) : (
                   <Play className="mr-2 h-3.5 w-3.5" />
                 )}
-                Run
+                {t('analysis.hodoscope.run')}
               </Button>
             )}
 
@@ -400,6 +434,7 @@ export function HodoscopePanel({
               className="h-8"
               size="sm"
               variant="outline"
+              aria-label={t('analysis.hodoscope.downloadJson')}
               disabled={
                 !currentAnalysis || currentAnalysis.status !== 'complete'
               }
@@ -419,7 +454,10 @@ export function HodoscopePanel({
           <div
             className="mt-3 h-1 overflow-hidden rounded-full bg-muted"
             role="progressbar"
-            aria-label="Hodoscope analysis progress"
+            aria-label={t('analysis.hodoscope.progressLabel', {
+              name: t('analysis.hodoscope.title'),
+              status: t('analysis.hodoscope.running'),
+            })}
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={currentAnalysis?.progress ?? 0}
@@ -444,7 +482,7 @@ export function HodoscopePanel({
           <div className="flex h-full min-h-48 items-center justify-center rounded-xl border border-border/70 bg-muted/10 text-muted-foreground">
             <div className="flex items-center gap-2 text-xs">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Loading embedding
+              {t('common.loading')}
             </div>
           </div>
         ) : projection?.points.length ? (
@@ -460,10 +498,11 @@ export function HodoscopePanel({
             <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-background shadow-sm">
               <Radar className="h-5 w-5 text-muted-foreground" />
             </div>
-            <h3 className="text-sm font-semibold">No embedding yet</h3>
+            <h3 className="text-sm font-semibold">
+              {t('analysis.hodoscope.noMapData')}
+            </h3>
             <p className="mt-1 max-w-md text-xs leading-relaxed text-muted-foreground">
-              Run Hodoscope to summarize trajectory actions and project their
-              behavioral neighborhoods into this interactive map.
+              {t('analysis.hodoscope.empty')}
             </p>
           </div>
         )}

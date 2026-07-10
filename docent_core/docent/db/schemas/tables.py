@@ -29,7 +29,12 @@ from docent.data_models.transcript import Transcript, TranscriptGroup
 from docent_core._db_service.schemas.base import SQLABase
 from docent_core.docent.ai_tools.search import SearchResult
 from docent_core.docent.db.filters import ComplexFilter, parse_filter_dict
-from docent_core.docent.db.schemas.auth_models import Organization, User
+from docent_core.docent.db.schemas.auth_models import (
+    DEFAULT_PREFERRED_LOCALE,
+    Organization,
+    SupportedLocale,
+    User,
+)
 
 logger = get_logger(__name__)
 
@@ -615,6 +620,12 @@ class SQLAUser(SQLABase):
     id = mapped_column(String(36), primary_key=True)
     email = mapped_column(String(255), nullable=False, unique=True, index=True)
     password_hash = mapped_column(String(255), nullable=False)
+    preferred_locale: Mapped[SupportedLocale] = mapped_column(
+        String(16),
+        nullable=False,
+        default=DEFAULT_PREFERRED_LOCALE,
+        server_default=DEFAULT_PREFERRED_LOCALE,
+    )
     created_at = mapped_column(
         DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None), nullable=False
     )
@@ -627,12 +638,20 @@ class SQLAUser(SQLABase):
         lazy="selectin",
     )
 
+    __table_args__ = (
+        CheckConstraint(
+            "preferred_locale IN ('en', 'zh-CN')",
+            name="check_users_preferred_locale",
+        ),
+    )
+
     @classmethod
     def from_user(cls, user: User) -> "SQLAUser":
         return cls(
             id=user.id,
             email=user.email,
             is_anonymous=user.is_anonymous,
+            preferred_locale=user.preferred_locale,
         )
 
     def to_user(self) -> User:
@@ -641,6 +660,7 @@ class SQLAUser(SQLABase):
             email=self.email,
             organization_ids=[org.id for org in self.organizations],
             is_anonymous=self.is_anonymous,
+            preferred_locale=self.preferred_locale,
         )
 
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -32,25 +32,61 @@ import {
 
 import { toast } from '@/hooks/use-toast';
 import { apiRestClient } from '@/app/services/apiService';
+import { useLocale } from '@/app/contexts/LocaleContext';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import type { MessageKey } from '@/lib/i18n/messages';
 
-const FRAMEWORK_OPTIONS = [
-  { id: 'langchain', label: 'LangChain' },
-  { id: 'inspect', label: 'Inspect' },
-  { id: 'llamaindex', label: 'LlamaIndex' },
-  { id: 'autogen', label: 'AutoGen' },
-  { id: 'crewai', label: 'CrewAI' },
-  { id: 'haystack', label: 'Haystack' },
-  { id: 'semantic_kernel', label: 'Semantic Kernel' },
-  { id: 'openai_agents', label: 'OpenAI Agents SDK' },
-  { id: 'custom', label: 'Custom Framework' },
-  { id: 'none', label: 'None' },
-  { id: 'other', label: 'Other' },
+interface OnboardingOption {
+  id: string;
+  canonicalLabel: string;
+  labelKey?: MessageKey;
+}
+
+const FRAMEWORK_OPTIONS: readonly OnboardingOption[] = [
+  { id: 'langchain', canonicalLabel: 'LangChain' },
+  { id: 'inspect', canonicalLabel: 'Inspect' },
+  { id: 'llamaindex', canonicalLabel: 'LlamaIndex' },
+  { id: 'autogen', canonicalLabel: 'AutoGen' },
+  { id: 'crewai', canonicalLabel: 'CrewAI' },
+  { id: 'haystack', canonicalLabel: 'Haystack' },
+  { id: 'semantic_kernel', canonicalLabel: 'Semantic Kernel' },
+  { id: 'openai_agents', canonicalLabel: 'OpenAI Agents SDK' },
+  {
+    id: 'custom',
+    canonicalLabel: 'Custom Framework',
+    labelKey: 'onboarding.framework.custom',
+  },
+  {
+    id: 'none',
+    canonicalLabel: 'None',
+    labelKey: 'onboarding.option.none',
+  },
+  {
+    id: 'other',
+    canonicalLabel: 'Other',
+    labelKey: 'onboarding.option.other',
+  },
 ];
 
-const PROVIDER_OPTIONS = [
-  { id: 'deepseek', label: 'DeepSeek' },
-  { id: 'custom', label: 'Custom endpoint' },
+const PROVIDER_OPTIONS: readonly OnboardingOption[] = [
+  { id: 'deepseek', canonicalLabel: 'DeepSeek' },
+  {
+    id: 'custom',
+    canonicalLabel: 'Custom endpoint',
+    labelKey: 'onboarding.provider.custom',
+  },
 ];
+
+function canonicalizeSelections(
+  selectedIds: string[],
+  options: readonly OnboardingOption[]
+): string[] {
+  return selectedIds.map(
+    (selectedId) =>
+      options.find((option) => option.id === selectedId)?.canonicalLabel ??
+      selectedId
+  );
+}
 
 interface OnboardingData {
   institution: string;
@@ -66,6 +102,7 @@ interface OnboardingData {
 export default function OnboardingPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useLocale();
   const redirectParam = searchParams.get('redirect') || '';
   const stepParam = searchParams.get('step');
   const [currentStep, setCurrentStep] = useState(
@@ -84,6 +121,42 @@ export default function OnboardingPage() {
   });
 
   const totalSteps = 5;
+
+  const tracingCode = `from docent.trace import initialize_tracing, agent_run
+
+# ${t('onboarding.code.initializeTracing')}
+initialize_tracing("my-collection")
+
+# ${t('onboarding.code.useDecorator')}
+@agent_run
+def analyze_document(document_text: str):
+    response = client.chat.completions.create(
+        model="gpt-5",
+        messages=[{"role": "user", "content": f"${t('onboarding.code.analyzePrompt')}: {document_text}"}]
+    )
+    return response.choices[0].message.content`;
+
+  const sdkCode = `from docent import Docent
+from docent.data_models import AgentRun, Transcript
+from docent.data_models.chat import parse_chat_message
+
+# ${t('onboarding.code.createClient')}
+client = Docent(api_key="your-api-key")
+collection_id = client.create_collection("my-evals")
+
+# ${t('onboarding.code.createAgentRun')}
+transcript = Transcript(messages=[
+    parse_chat_message({"role": "user", "content": "${t('onboarding.code.userGreeting')}"}),
+    parse_chat_message({"role": "assistant", "content": "${t('onboarding.code.assistantGreeting')}"})
+])
+
+agent_run = AgentRun(
+    transcripts={"default": transcript},
+    metadata={"model": "gpt-5", "scores": {"accuracy": 0.95}}
+)
+
+# ${t('onboarding.code.upload')}
+client.add_agent_runs(collection_id, [agent_run])`;
 
   const handleNext = () => {
     if (currentStep < totalSteps) {
@@ -113,7 +186,7 @@ export default function OnboardingPage() {
       // Set initial URL without triggering navigation
       router.push('/onboarding?step=1', { scroll: false });
     }
-  }, []);
+  }, [currentStep, router, searchParams]);
 
   // Handle URL changes (browser back/forward navigation)
   useEffect(() => {
@@ -139,14 +212,20 @@ export default function OnboardingPage() {
   const handleCompleteOnboarding = async () => {
     try {
       const frameworksData = {
-        selected: onboardingData.frameworks,
+        selected: canonicalizeSelections(
+          onboardingData.frameworks,
+          FRAMEWORK_OPTIONS
+        ),
         other: onboardingData.otherFrameworkText
           ? [onboardingData.otherFrameworkText]
           : [],
       };
 
       const providersData = {
-        selected: onboardingData.providers,
+        selected: canonicalizeSelections(
+          onboardingData.providers,
+          PROVIDER_OPTIONS
+        ),
         other: onboardingData.otherProviderText
           ? [onboardingData.otherProviderText]
           : [],
@@ -163,16 +242,16 @@ export default function OnboardingPage() {
       });
 
       toast({
-        title: 'Welcome to Docent!',
-        description: 'Your account has been set up successfully.',
+        title: t('onboarding.toast.welcomeTitle'),
+        description: t('onboarding.toast.welcomeDescription'),
       });
       const redirectUrl = redirectParam || '/dashboard';
       router.push(redirectUrl);
     } catch (error) {
       console.error('Failed to complete onboarding:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to complete onboarding. Please try again.',
+        title: t('onboarding.toast.errorTitle'),
+        description: t('onboarding.toast.errorDescription'),
         variant: 'destructive',
       });
     }
@@ -192,7 +271,7 @@ export default function OnboardingPage() {
   const renderMultiSelectStep = (
     title: string,
     description: string,
-    options: Array<{ id: string; label: string }>,
+    options: readonly OnboardingOption[],
     selectedItems: string[],
     otherText: string,
     otherTextField: keyof OnboardingData,
@@ -218,44 +297,48 @@ export default function OnboardingPage() {
       {/* Options Grid */}
       <div className="grid grid-cols-2 gap-3 max-w-2xl mx-auto">
         {options.map((option) => {
+          const label = option.labelKey
+            ? t(option.labelKey)
+            : option.canonicalLabel;
+
           // Special handling for "Other" option
           if (option.id === 'other') {
             return (
               <Card
                 key={option.id}
                 className={`cursor-pointer transition-all hover:shadow-md border col-span-2 ${
-                  selectedItems.includes(option.label)
+                  selectedItems.includes(option.id)
                     ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
                     : 'border-gray-200 dark:border-gray-700'
                 }`}
                 onClick={() => {
-                  if (selectedItems.includes(option.label)) {
+                  if (selectedItems.includes(option.id)) {
                     // Remove if already selected - preserve custom text
                     const updatedItems = selectedItems.filter(
-                      (f) => f !== option.label
+                      (itemId) => itemId !== option.id
                     );
                     updateOnboardingData(itemsField, updatedItems);
                     // Keep the custom text for later restoration
                   } else {
                     // Add if not selected
-                    const updatedItems = [...selectedItems, option.label];
+                    const updatedItems = [...selectedItems, option.id];
                     updateOnboardingData(itemsField, updatedItems);
                   }
                 }}
               >
                 <CardContent className="p-3">
-                  {selectedItems.includes(option.label) ? (
+                  {selectedItems.includes(option.id) ? (
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <h3 className="font-medium text-gray-900 dark:text-white text-sm">
-                          {option.label}
+                          {label}
                         </h3>
                         <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
                           <div className="w-2 h-2 bg-white rounded-full"></div>
                         </div>
                       </div>
                       <Input
-                        placeholder="Please specify..."
+                        placeholder={t('onboarding.other.placeholder')}
                         value={otherText}
                         onChange={(e) => {
                           updateOnboardingData(otherTextField, e.target.value);
@@ -268,7 +351,7 @@ export default function OnboardingPage() {
                   ) : (
                     <div className="flex items-center justify-between">
                       <h3 className="font-medium text-gray-900 dark:text-white text-sm">
-                        {option.label}
+                        {label}
                       </h3>
                     </div>
                   )}
@@ -282,20 +365,20 @@ export default function OnboardingPage() {
             <Card
               key={option.id}
               className={`cursor-pointer transition-all hover:shadow-md border ${
-                selectedItems.includes(option.label)
+                selectedItems.includes(option.id)
                   ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
                   : 'border-gray-200 dark:border-gray-700'
               }`}
               onClick={() => {
-                if (selectedItems.includes(option.label)) {
+                if (selectedItems.includes(option.id)) {
                   // Remove if already selected
                   const updatedItems = selectedItems.filter(
-                    (f) => f !== option.label
+                    (itemId) => itemId !== option.id
                   );
                   updateOnboardingData(itemsField, updatedItems);
                 } else {
                   // Add if not selected
-                  const updatedItems = [...selectedItems, option.label];
+                  const updatedItems = [...selectedItems, option.id];
                   updateOnboardingData(itemsField, updatedItems);
                 }
               }}
@@ -304,10 +387,10 @@ export default function OnboardingPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-medium text-gray-900 dark:text-white text-sm">
-                      {option.label}
+                      {label}
                     </h3>
                   </div>
-                  {selectedItems.includes(option.label) && (
+                  {selectedItems.includes(option.id) && (
                     <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
                       <div className="w-2 h-2 bg-white rounded-full"></div>
                     </div>
@@ -326,11 +409,10 @@ export default function OnboardingPage() {
       {/* Simple Header */}
       <div className="text-center space-y-4">
         <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
-          Welcome to Docent
+          {t('onboarding.step1.title')}
         </h1>
         <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-          Help us make Docent better by sharing how you plan to use the
-          platform.
+          {t('onboarding.step1.description')}
         </p>
       </div>
 
@@ -341,7 +423,7 @@ export default function OnboardingPage() {
             htmlFor="institution"
             className="text-base font-medium text-gray-900 dark:text-white"
           >
-            What institution are you with?
+            {t('onboarding.step1.institutionLabel')}
           </Label>
           <Input
             id="institution"
@@ -349,7 +431,7 @@ export default function OnboardingPage() {
             onChange={(e) =>
               updateOnboardingData('institution', e.target.value)
             }
-            placeholder="e.g., Stanford University, Google, Independent Researcher"
+            placeholder={t('onboarding.step1.institutionPlaceholder')}
             className="h-12 text-base border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
           />
         </div>
@@ -359,13 +441,13 @@ export default function OnboardingPage() {
             htmlFor="task"
             className="text-base font-medium text-gray-900 dark:text-white"
           >
-            What is your task?
+            {t('onboarding.step1.taskLabel')}
           </Label>
           <Textarea
             id="task"
             value={onboardingData.task}
             onChange={(e) => updateOnboardingData('task', e.target.value)}
-            placeholder="e.g., Evaluating AI agents, Analyzing conversation transcripts, Building evaluation datasets"
+            placeholder={t('onboarding.step1.taskPlaceholder')}
             rows={4}
             className="text-base border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-gray-500 focus:border-gray-500 resize-none"
           />
@@ -376,13 +458,13 @@ export default function OnboardingPage() {
             htmlFor="helpType"
             className="text-base font-medium text-gray-900 dark:text-white"
           >
-            How can Docent help?
+            {t('onboarding.step1.helpLabel')}
           </Label>
           <Textarea
             id="helpType"
             value={onboardingData.helpType}
             onChange={(e) => updateOnboardingData('helpType', e.target.value)}
-            placeholder="e.g., Judge refinement, Behavior discovery, Automated evaluation"
+            placeholder={t('onboarding.step1.helpPlaceholder')}
             rows={4}
             className="text-base border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-gray-500 focus:border-gray-500 resize-none"
           />
@@ -393,7 +475,7 @@ export default function OnboardingPage() {
             htmlFor="discoverySource"
             className="text-base font-medium text-gray-900 dark:text-white"
           >
-            How did you find out about Docent?
+            {t('onboarding.step1.discoveryLabel')}
           </Label>
           <Input
             id="discoverySource"
@@ -401,7 +483,7 @@ export default function OnboardingPage() {
             onChange={(e) =>
               updateOnboardingData('discoverySource', e.target.value)
             }
-            placeholder="e.g., Colleague recommendation, Search, Social media, Conference"
+            placeholder={t('onboarding.step1.discoveryPlaceholder')}
             className="h-12 text-base border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
           />
         </div>
@@ -419,11 +501,10 @@ export default function OnboardingPage() {
           </div>
         </div>
         <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-          Join Our Community
+          {t('onboarding.step2.title')}
         </h2>
         <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-          Connect with fellow researchers and get personalized support from our
-          team
+          {t('onboarding.step2.description')}
         </p>
       </div>
 
@@ -433,11 +514,10 @@ export default function OnboardingPage() {
           <CardHeader>
             <CardTitle className="text-gray-900 dark:text-white flex items-center gap-2">
               <Slack className="h-5 w-5 text-gray-600 dark:text-gray-400" />
-              Join our Slack community
+              {t('onboarding.step2.slackTitle')}
             </CardTitle>
             <CardDescription className="text-gray-600 dark:text-gray-400">
-              Connect with other researchers, share insights, and get help from
-              our team in real-time
+              {t('onboarding.step2.slackDescription')}
             </CardDescription>
           </CardHeader>
           <CardContent className="flex justify-end">
@@ -448,7 +528,7 @@ export default function OnboardingPage() {
                 window.open('https://transluce.org/docent/slack', '_blank')
               }
             >
-              Join Docent Community Slack
+              {t('onboarding.step2.slackButton')}
             </Button>
           </CardContent>
         </Card>
@@ -457,11 +537,10 @@ export default function OnboardingPage() {
           <CardHeader>
             <CardTitle className="text-gray-900 dark:text-white flex items-center gap-2">
               <Calendar className="h-5 w-5 text-gray-600 dark:text-gray-400" />
-              Book a personalized demo
+              {t('onboarding.step2.demoTitle')}
             </CardTitle>
             <CardDescription className="text-gray-600 dark:text-gray-400">
-              Schedule a one-on-one consultation with our team to explore how
-              Docent can accelerate your research
+              {t('onboarding.step2.demoDescription')}
             </CardDescription>
           </CardHeader>
           <CardContent className="flex justify-end">
@@ -475,7 +554,7 @@ export default function OnboardingPage() {
                 )
               }
             >
-              Schedule Call
+              {t('onboarding.step2.demoButton')}
             </Button>
           </CardContent>
         </Card>
@@ -484,11 +563,10 @@ export default function OnboardingPage() {
           <CardHeader>
             <CardTitle className="text-gray-900 dark:text-white flex items-center gap-2">
               <MessageCircle className="h-5 w-5 text-gray-600 dark:text-gray-400" />
-              Email our team
+              {t('onboarding.step2.emailTitle')}
             </CardTitle>
             <CardDescription className="text-gray-600 dark:text-gray-400">
-              Have questions or need support? Our team is here to help you
-              succeed
+              {t('onboarding.step2.emailDescription')}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -498,12 +576,6 @@ export default function OnboardingPage() {
                 info@transluce.org
               </span>
             </div>
-            {/* <div className="flex items-center gap-2">
-              <Phone className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-              <span className="text-sm text-gray-700 dark:text-gray-300">
-                +1 (555) 123-4567
-              </span>
-            </div> */}
             <div className="flex justify-end">
               <Button
                 variant="outline"
@@ -512,7 +584,7 @@ export default function OnboardingPage() {
                   window.open('mailto:info@transluce.org', '_blank')
                 }
               >
-                Send Email
+                {t('onboarding.step2.emailButton')}
               </Button>
             </div>
           </CardContent>
@@ -523,8 +595,8 @@ export default function OnboardingPage() {
 
   const renderStep3 = () =>
     renderMultiSelectStep(
-      'Which frameworks do you use?',
-      "Select any frameworks you're currently using",
+      t('onboarding.step3.title'),
+      t('onboarding.step3.description'),
       FRAMEWORK_OPTIONS,
       onboardingData.frameworks,
       onboardingData.otherFrameworkText,
@@ -535,8 +607,8 @@ export default function OnboardingPage() {
 
   const renderStep4 = () =>
     renderMultiSelectStep(
-      'Which providers do you use?',
-      "Select any providers you're currently using",
+      t('onboarding.step4.title'),
+      t('onboarding.step4.description'),
       PROVIDER_OPTIONS,
       onboardingData.providers,
       onboardingData.otherProviderText,
@@ -555,10 +627,10 @@ export default function OnboardingPage() {
           </div>
         </div>
         <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-          Choose Your Path
+          {t('onboarding.step5.title')}
         </h2>
         <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-          Pick the method that works best for you to get data into Docent
+          {t('onboarding.step5.description')}
         </p>
       </div>
 
@@ -569,11 +641,10 @@ export default function OnboardingPage() {
           <CardHeader>
             <CardTitle className="text-gray-900 dark:text-white flex items-center gap-2">
               <Lightbulb className="h-5 w-5 text-gray-600 dark:text-gray-400" />
-              Option 1: Trace your agents
+              {t('onboarding.step5.traceTitle')}
             </CardTitle>
             <CardDescription className="text-gray-600 dark:text-gray-400">
-              Add tracing to your agents to automatically capture conversations
-              and metadata
+              {t('onboarding.step5.traceDescription')}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -587,19 +658,7 @@ export default function OnboardingPage() {
                 }}
                 className="text-sm"
               >
-                {`from docent.trace import initialize_tracing, agent_run
-
-# Initialize tracing
-initialize_tracing("my-collection")
-
-# Use the decorator
-@agent_run
-def analyze_document(document_text: str):
-    response = client.chat.completions.create(
-        model="gpt-5",
-        messages=[{"role": "user", "content": f"Analyze: {document_text}"}]
-    )
-    return response.choices[0].message.content`}
+                {tracingCode}
               </SyntaxHighlighter>
             </div>
             <div className="flex justify-end">
@@ -613,7 +672,7 @@ def analyze_document(document_text: str):
                   )
                 }
               >
-                View Tracing Docs
+                {t('onboarding.step5.tracingDocs')}
               </Button>
             </div>
           </CardContent>
@@ -624,11 +683,10 @@ def analyze_document(document_text: str):
           <CardHeader>
             <CardTitle className="text-gray-900 dark:text-white flex items-center gap-2">
               <Building2 className="h-5 w-5 text-gray-600 dark:text-gray-400" />
-              Option 2: Drag and drop Inspect evals
+              {t('onboarding.step5.inspectTitle')}
             </CardTitle>
             <CardDescription className="text-gray-600 dark:text-gray-400">
-              Import evaluation results from Inspect by simply dragging and
-              dropping your eval files
+              {t('onboarding.step5.inspectDescription')}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -645,18 +703,9 @@ def analyze_document(document_text: str):
                   src="https://transluce-videos.s3.us-east-1.amazonaws.com/docent-landing-page/inspect-drag-drop.mp4"
                   type="video/mp4"
                 />
-                Your browser does not support the video tag.
+                {t('onboarding.step5.videoUnsupported')}
               </video>
             </div>
-            {/* <div className="flex justify-end">
-              <Button
-                variant="outline"
-                className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
-                onClick={() => window.open('/docs/quickstart', '_blank')}
-              >
-                Learn More
-              </Button>
-            </div> */}
           </CardContent>
         </Card>
 
@@ -665,11 +714,10 @@ def analyze_document(document_text: str):
           <CardHeader>
             <CardTitle className="text-gray-900 dark:text-white flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-gray-600 dark:text-gray-400" />
-              Option 3: Use the SDK
+              {t('onboarding.step5.sdkTitle')}
             </CardTitle>
             <CardDescription className="text-gray-600 dark:text-gray-400">
-              Programmatically upload data and interact with Docent using our
-              Python SDK
+              {t('onboarding.step5.sdkDescription')}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -683,27 +731,7 @@ def analyze_document(document_text: str):
                 }}
                 className="text-sm"
               >
-                {`from docent import Docent
-from docent.data_models import AgentRun, Transcript
-from docent.data_models.chat import parse_chat_message
-
-# Create client and collection
-client = Docent(api_key="your-api-key")
-collection_id = client.create_collection("my-evals")
-
-# Create agent run
-transcript = Transcript(messages=[
-    parse_chat_message({"role": "user", "content": "Hello"}),
-    parse_chat_message({"role": "assistant", "content": "Hi there!"})
-])
-
-agent_run = AgentRun(
-    transcripts={"default": transcript},
-    metadata={"model": "gpt-5", "scores": {"accuracy": 0.95}}
-)
-
-# Upload to Docent
-client.add_agent_runs(collection_id, [agent_run])`}
+                {sdkCode}
               </SyntaxHighlighter>
             </div>
             <div className="flex justify-end">
@@ -714,7 +742,7 @@ client.add_agent_runs(collection_id, [agent_run])`}
                   window.open('https://docs.transluce.org/en/latest/', '_blank')
                 }
               >
-                View SDK Docs
+                {t('onboarding.step5.sdkDocs')}
               </Button>
             </div>
           </CardContent>
@@ -732,10 +760,14 @@ client.add_agent_runs(collection_id, [agent_run])`}
         <div className="space-y-12 pb-8">
           {/* Simple Progress Bar */}
           <div className="space-y-3">
-            <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+            <div className="flex items-center justify-between gap-4 text-sm text-gray-600 dark:text-gray-400">
               <span>
-                Step {currentStep} of {totalSteps}
+                {t('onboarding.progress', {
+                  current: currentStep,
+                  total: totalSteps,
+                })}
               </span>
+              <LanguageSwitcher />
             </div>
             <div className="relative h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
               <div
@@ -763,7 +795,7 @@ client.add_agent_runs(collection_id, [agent_run])`}
                 className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
               >
                 <ArrowLeft className="h-4 w-4" />
-                Back
+                {t('onboarding.navigation.back')}
               </Button>
             )}
             {currentStep === 1 && <div></div>}
@@ -773,7 +805,9 @@ client.add_agent_runs(collection_id, [agent_run])`}
               className="flex items-center gap-2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-200"
               size="lg"
             >
-              {currentStep === totalSteps ? 'Complete Setup' : 'Continue'}
+              {currentStep === totalSteps
+                ? t('onboarding.navigation.complete')
+                : t('onboarding.navigation.continue')}
               {currentStep < totalSteps && <ArrowRight className="h-4 w-4" />}
             </Button>
           </div>

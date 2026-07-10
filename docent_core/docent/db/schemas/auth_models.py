@@ -2,6 +2,10 @@ from enum import Enum
 
 from pydantic import BaseModel
 
+from docent_core.localization import DEFAULT_LOCALE, SupportedLocale
+
+DEFAULT_PREFERRED_LOCALE = DEFAULT_LOCALE
+
 PERMISSION_LEVELS = {
     "read": 1,
     "write": 2,
@@ -34,6 +38,7 @@ class User(BaseModel):
     email: str
     organization_ids: list[str]
     is_anonymous: bool = False
+    preferred_locale: SupportedLocale = DEFAULT_PREFERRED_LOCALE
 
 
 class Organization(BaseModel):

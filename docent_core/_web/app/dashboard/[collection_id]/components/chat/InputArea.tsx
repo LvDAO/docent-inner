@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { useLocale } from '@/app/contexts/LocaleContext';
 
 interface InputAreaProps {
   className?: string;
@@ -44,6 +45,7 @@ export default function InputArea({
   errorMessage,
   inputHeaderElement,
 }: InputAreaProps) {
+  const { t } = useLocale();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { width } = useWindowSize();
 
@@ -149,6 +151,13 @@ export default function InputArea({
           }
         }}
         disabled={disabled}
+        aria-label={
+          isSendingMessage
+            ? onCancelMessage
+              ? t('chat.input.cancel')
+              : t('chat.input.sending')
+            : t('chat.input.send')
+        }
       >
         {isSendingMessage && onCancelMessage ? (
           <Square size={12} />
@@ -171,7 +180,7 @@ export default function InputArea({
           onRetry?.();
         }}
       >
-        <RotateCwIcon className="size-3" /> Retry
+        <RotateCwIcon className="size-3" /> {t('chat.input.retry')}
       </Button>
     );
   };
@@ -198,6 +207,7 @@ export default function InputArea({
                 event.preventDefault();
                 scrollToBottom();
               }}
+              aria-label={t('chat.input.scrollToBottom')}
             >
               <ArrowDown size={16} />
             </Button>
@@ -219,7 +229,7 @@ export default function InputArea({
           <Textarea
             data-testid="multimodal-input"
             ref={textareaRef}
-            placeholder="Send a message..."
+            placeholder={t('chat.input.placeholder')}
             value={input}
             onChange={handleInput}
             className={cn(

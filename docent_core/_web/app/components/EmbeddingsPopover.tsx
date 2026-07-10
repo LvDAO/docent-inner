@@ -16,8 +16,10 @@ import { ProgressBar } from './ProgressBar';
 import { apiRestClient } from '../services/apiService';
 import { useHasCollectionWritePermission } from '@/lib/permissions/hooks';
 import { cn } from '@/lib/utils';
+import { useLocale } from '../contexts/LocaleContext';
 
 const EmbeddingsPopover: React.FC = () => {
+  const { t } = useLocale();
   const [isLoading, setIsLoading] = useState(false);
   const [hasEmbeddings, setHasEmbeddings] = useState(false);
   const [isQueued, setIsQueued] = useState(false);
@@ -137,21 +139,33 @@ const EmbeddingsPopover: React.FC = () => {
   const renderStatusContent = () => {
     if (isEmbeddingInProgress || isQueued || isLoading) {
       return (
-        <div className="border rounded-sm bg-blue-bg border-blue-border p-3 space-y-2">
+        <div
+          className="border rounded-sm bg-blue-bg border-blue-border p-3 space-y-2"
+          role="status"
+          aria-live="polite"
+        >
           <div className="flex items-center justify-between">
             <div className="text-xs font-medium text-primary">
-              Computing Embeddings
+              {t('workspace.embeddings.computing')}
             </div>
             <div className="text-xs text-primary">
-              {embeddingProgress?.indexing_phase || 'Queued'}
+              {embeddingProgress?.indexing_phase ||
+                t('workspace.embeddings.queued')}
             </div>
           </div>
 
           {embeddingProgress && (
             <>
-              <div className="space-y-1">
+              <div
+                className="space-y-1"
+                role="progressbar"
+                aria-label={t('workspace.embeddings.embeddingProgress')}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={embeddingProgress.embedding_progress}
+              >
                 <div className="flex items-center justify-between text-xs text-primary">
-                  <span>Embedding Progress</span>
+                  <span>{t('workspace.embeddings.embeddingProgress')}</span>
                   <span>{embeddingProgress.embedding_progress}%</span>
                 </div>
                 <ProgressBar
@@ -161,9 +175,16 @@ const EmbeddingsPopover: React.FC = () => {
               </div>
 
               {embeddingProgress.indexing_progress > 0 && (
-                <div className="space-y-1">
+                <div
+                  className="space-y-1"
+                  role="progressbar"
+                  aria-label={t('workspace.embeddings.indexingProgress')}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={embeddingProgress.indexing_progress}
+                >
                   <div className="flex items-center justify-between text-xs text-primary">
-                    <span>Indexing Progress</span>
+                    <span>{t('workspace.embeddings.indexingProgress')}</span>
                     <span>{embeddingProgress.indexing_progress}%</span>
                   </div>
                   <ProgressBar
@@ -180,25 +201,30 @@ const EmbeddingsPopover: React.FC = () => {
 
     if (!hasEmbeddings) {
       return (
-        <div className="border rounded-sm bg-red-bg border-red-border p-3">
+        <div
+          className="border rounded-sm bg-red-bg border-red-border p-3"
+          role="status"
+        >
           <div className="text-xs font-medium text-primary mb-1">
-            Embeddings Missing
+            {t('workspace.embeddings.missing')}
           </div>
           <div className="text-xs text-primary">
-            Some runs are missing embeddings. If new agent runs are being added,
-            embeddings will be computed automatically.
+            {t('workspace.embeddings.missingDescription')}
           </div>
         </div>
       );
     }
 
     return (
-      <div className="border rounded-sm bg-green-bg border-green-border p-2">
+      <div
+        className="border rounded-sm bg-green-bg border-green-border p-2"
+        role="status"
+      >
         <div className="text-xs font-medium text-primary mb-1">
-          Embeddings Available
+          {t('workspace.embeddings.available')}
         </div>
         <div className="text-xs text-primary">
-          Embeddings are available for all runs.
+          {t('workspace.embeddings.availableDescription')}
         </div>
       </div>
     );
@@ -221,21 +247,28 @@ const EmbeddingsPopover: React.FC = () => {
           )}
           title={
             !hasEmbeddings
-              ? 'Embeddings missing - click to manage'
-              : 'Manage embeddings'
+              ? t('workspace.embeddings.missingManageTitle')
+              : t('workspace.embeddings.manageTitle')
+          }
+          aria-label={
+            !hasEmbeddings
+              ? t('workspace.embeddings.missingManageTitle')
+              : t('workspace.embeddings.manageTitle')
           }
         >
           <Database className="h-4 w-4" />
-          Index
+          {t('workspace.embeddings.indexButton')}
           {isEmbeddingInProgress && ` ${embeddingProgress.embedding_progress}%`}
         </Button>
       </PopoverTrigger>
 
       <PopoverContent className="w-96 p-3 space-y-3">
         <div className="space-y-1">
-          <h3 className="text-sm font-medium">Indexing</h3>
+          <h3 className="text-sm font-medium">
+            {t('workspace.embeddings.indexingTitle')}
+          </h3>
           <p className="text-xs text-muted-foreground">
-            Compute embedding indices to speed up time to first results.
+            {t('workspace.embeddings.indexingDescription')}
           </p>
         </div>
 
@@ -245,11 +278,14 @@ const EmbeddingsPopover: React.FC = () => {
           <Button
             onClick={handleRecomputeEmbeddings}
             disabled={!canComputeEmbeddings}
+            aria-busy={isLoading || Boolean(isEmbeddingInProgress)}
             className="w-full gap-2 h-7"
             size="sm"
           >
             <RefreshCw className={cn('h-3 w-3', isLoading && 'animate-spin')} />
-            {isEmbeddingInProgress ? 'Computing...' : 'Compute Embeddings'}
+            {isEmbeddingInProgress
+              ? t('workspace.embeddings.computingAction')
+              : t('workspace.embeddings.computeAction')}
           </Button>
         </div>
       </PopoverContent>

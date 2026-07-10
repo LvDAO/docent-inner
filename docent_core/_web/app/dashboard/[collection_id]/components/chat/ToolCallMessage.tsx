@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Loader2, ChevronRight, ChevronDown } from 'lucide-react';
 import { ToolCall } from '@/app/types/transcriptTypes';
+import { useLocale } from '@/app/contexts/LocaleContext';
 
 export default function ToolCallMessage({
   tool,
@@ -11,6 +12,7 @@ export default function ToolCallMessage({
   tool: ToolCall;
   isStreaming?: boolean;
 }) {
+  const { t } = useLocale();
   const [isExpanded, setIsExpanded] = useState(false);
 
   const fullArgs = () =>
@@ -23,7 +25,7 @@ export default function ToolCallMessage({
   return (
     <div className="mt-1 p-1.5 bg-secondary/85 rounded text-xs break-all whitespace-pre-wrap">
       <div className="text-[10px] text-muted-foreground mb-0.5">
-        Tool Call ID: {tool.id}
+        {t('chat.tool.callId', { id: tool.id })}
       </div>
       <div className="font-mono">
         {isExpandable ? (

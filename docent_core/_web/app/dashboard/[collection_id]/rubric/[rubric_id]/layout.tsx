@@ -20,6 +20,7 @@ import {
 } from '@/providers/use-refinement-tab';
 import { TextSelectionProvider } from '@/providers/use-text-selection';
 import { useAppSelector } from '@/app/store/hooks';
+import { useLocale } from '@/app/contexts/LocaleContext';
 import {
   ResizableHandle,
   ResizablePanel,
@@ -37,6 +38,7 @@ function RubricLayoutBody({
   rubricId,
   children,
 }: RubricLayoutBodyProps) {
+  const { t } = useLocale();
   const { result_id: resultId } = useParams<{ result_id?: string }>();
   const isOnResultRoute = !!resultId;
 
@@ -174,7 +176,7 @@ function RubricLayoutBody({
             </ResizablePanel>
             {(showResultPanel || showRightPanel) && (
               <ResizableHandle
-                aria-label="Resize rubric definition panel"
+                aria-label={t('misc.rubric.resizeDefinitionPanel')}
                 id="rubric-definition-handle"
                 withHandle
               />
@@ -197,7 +199,7 @@ function RubricLayoutBody({
             </ResizablePanel>
             {showRightPanel && (
               <ResizableHandle
-                aria-label="Resize rubric result and assistant panels"
+                aria-label={t('misc.rubric.resizeResultAssistantPanels')}
                 id="rubric-result-handle"
                 withHandle
               />
@@ -225,12 +227,14 @@ function RubricLayoutBody({
               >
                 {isOnResultRoute && (
                   <TabsList className="mb-2 grid w-full shrink-0 grid-cols-3 justify-start">
-                    <TabsTrigger value="refine">Refine</TabsTrigger>
+                    <TabsTrigger value="refine">
+                      {t('misc.rubric.refine')}
+                    </TabsTrigger>
                     <TabsTrigger value="analyze" disabled={!isOnResultRoute}>
-                      Analyze
+                      {t('misc.rubric.analyze')}
                     </TabsTrigger>
                     <TabsTrigger value="label" disabled={!isOnResultRoute}>
-                      Label
+                      {t('misc.rubric.label')}
                     </TabsTrigger>
                   </TabsList>
                 )}
@@ -264,7 +268,7 @@ function RubricLayoutBody({
                     />
                   ) : (
                     <div className="p-2 text-xs text-muted-foreground">
-                      Open a result to edit labels.
+                      {t('misc.rubric.openResultToEditLabels')}
                     </div>
                   )}
                 </TabsContent>

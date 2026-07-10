@@ -16,6 +16,7 @@ import {
   JudgeRunLabel,
 } from '@/app/store/rubricSlice';
 import { useRubricVersion } from '@/providers/use-rubric-version';
+import { useLocale } from '@/app/contexts/LocaleContext';
 
 interface AgreementPopoverProps {
   judgeResults: JudgeResultWithCitations[];
@@ -26,6 +27,7 @@ export const AgreementPopover = ({
   judgeResults,
   judgeRunLabels,
 }: AgreementPopoverProps) => {
+  const { t } = useLocale();
   const { rubric_id: rubricId, collection_id: collectionId } = useParams<{
     rubric_id: string;
     collection_id: string;
@@ -178,19 +180,19 @@ export const AgreementPopover = ({
     if (filteredJudgeResults.length === 0) {
       return (
         <span className="text-xs text-muted-foreground">
-          No judge results to compute stats.
+          {t('results.agreement.noJudgeResults')}
         </span>
       );
     } else if (visibleProperty === null) {
       return (
         <span className="text-xs text-muted-foreground">
-          Add a countable label to compute stats.
+          {t('results.agreement.addCountableLabel')}
         </span>
       );
     } else if (judgeRunLabels.length === 0) {
       return (
         <span className="text-xs text-muted-foreground">
-          No judge run labels to compute stats.
+          {t('results.agreement.noRunLabels')}
         </span>
       );
     } else if (countableProperties.length > 0) {
@@ -205,7 +207,7 @@ export const AgreementPopover = ({
           <span className="hidden 2xl:inline">
             <span className="font-mono">{visibleProperty} </span>
           </span>
-          agreement:{' '}
+          {t('results.agreement.label')}:{' '}
           {visibleProperty ? (
             <span>
               {propertyStats[visibleProperty]
@@ -224,11 +226,13 @@ export const AgreementPopover = ({
       <PopoverContent className="w-80 p-3" align="end" sideOffset={6}>
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <div className="text-xs font-medium">Per property</div>
+            <div className="text-xs font-medium">
+              {t('results.agreement.perProperty')}
+            </div>
             <button
               onClick={() => setIsEditMode(!isEditMode)}
               className="p-1 hover:bg-secondary disabled:hover:bg-transparent disabled:cursor-not-allowed rounded transition-colors"
-              aria-label="Edit visible property"
+              aria-label={t('results.agreement.editVisibleProperty')}
               disabled={
                 filteredJudgeResults.length === 0 ||
                 countableProperties.length === 0 ||
@@ -241,7 +245,7 @@ export const AgreementPopover = ({
           {content()}
           {isEditMode && (
             <div className="text-xs text-muted-foreground">
-              Select a property to display on the button
+              {t('results.agreement.selectProperty')}
             </div>
           )}
         </div>

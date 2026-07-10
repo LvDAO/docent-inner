@@ -11,6 +11,7 @@ import {
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 
 import { useAppDispatch, useAppSelector } from '@/app/store/hooks';
+import { useLocale } from '@/app/contexts/LocaleContext';
 import { getActionsSummary } from '@/app/store/transcriptSlice';
 import { Citation } from '@/app/types/experimentViewerTypes';
 import {
@@ -37,38 +38,53 @@ interface AgentSummaryProps {
 
 const TYPE_STYLES: Record<
   ObservationCategory,
-  { icon: JSX.Element; color: string; bgColor: string; label: string }
+  { icon: JSX.Element; color: string; bgColor: string }
 > = {
   mistake: {
     icon: <AlertTriangle className="w-3.5 h-3.5" />,
     color: 'text-red-text',
     bgColor: 'bg-red-text',
-    label: 'Mistake',
   },
   critical_insight: {
     icon: <Check className="w-3.5 h-3.5" />,
     color: 'text-green-text',
     bgColor: 'bg-green-text',
-    label: 'Critical Insight',
   },
   near_miss: {
     icon: <ArrowLeftRight className="w-3.5 h-3.5" />,
     color: 'text-blue-text',
     bgColor: 'bg-blue-text',
-    label: 'Near Miss',
   },
   weird_behavior: {
     icon: <SmilePlus className="w-3.5 h-3.5" />,
     color: 'text-purple-text',
     bgColor: 'bg-purple-text',
-    label: 'Interesting Behavior',
   },
   cheating: {
     icon: <X className="w-3.5 h-3.5" />,
     color: 'text-orange-text',
     bgColor: 'bg-orange-text',
-    label: 'Cheating',
   },
+};
+
+type Translator = ReturnType<typeof useLocale>['t'];
+
+const getObservationLabel = (
+  category: ObservationCategory,
+  t: Translator
+): string => {
+  switch (category) {
+    case 'mistake':
+      return t('analysis.summary.mistake');
+    case 'critical_insight':
+      return t('analysis.summary.criticalInsight');
+    case 'near_miss':
+      return t('analysis.summary.nearMiss');
+    case 'weird_behavior':
+      return t('analysis.summary.interestingBehavior');
+    case 'cheating':
+      return t('analysis.summary.cheating');
+  }
 };
 
 // Agent Behavior Sequence Component
@@ -77,6 +93,8 @@ const BehaviorSequence: React.FC<{
   actionsSummary?: { low_level?: LowLevelAction[] } | null;
   onActionClick?: (actionIndex: number) => void;
 }> = ({ observations = [], actionsSummary, onActionClick }) => {
+  const { t } = useLocale();
+
   // If there are no observations, don't render anything
   if (!observations || observations.length === 0) {
     return null;
@@ -108,21 +126,27 @@ const BehaviorSequence: React.FC<{
 
   return (
     <div className="bg-background text-primary p-2 rounded-md text-sm border border-border shadow-sm">
-      <h3 className="text-sm font-medium mb-1">Notable moments</h3>
+      <h3 className="text-sm font-medium mb-1">
+        {t('analysis.summary.notableMoments')}
+      </h3>
 
       {/* Legend */}
       <div className="flex flex-wrap gap-1 mb-2">
-        {Object.entries(TYPE_STYLES).map(([category, style]) => (
+        {Object.entries(TYPE_STYLES).map(([category]) => (
           <div key={category} className="flex items-center mr-1 mb-1">
             <div
               className={`w-3 h-3 ${getBackgroundColorClass(category as ObservationCategory)} mr-1`}
             ></div>
-            <span className="text-xs whitespace-nowrap">{style.label}</span>
+            <span className="text-xs whitespace-nowrap">
+              {getObservationLabel(category as ObservationCategory, t)}
+            </span>
           </div>
         ))}
         <div className="flex items-center mr-1 mb-1">
           <div className="w-3 h-3 bg-secondary border mr-1"></div>
-          <span className="text-xs whitespace-nowrap">No observations</span>
+          <span className="text-xs whitespace-nowrap">
+            {t('analysis.summary.noObservations')}
+          </span>
         </div>
       </div>
 
@@ -145,8 +169,12 @@ const BehaviorSequence: React.FC<{
                 )}
                 title={
                   hasObservation
-                    ? `Action Unit ${index}: ${TYPE_STYLES[moments[0].category].label} - ${moments[0].description}`
-                    : `Action Unit ${index}`
+                    ? t('analysis.summary.actionUnitObservation', {
+                        index,
+                        label: getObservationLabel(moments[0].category, t),
+                        description: moments[0].description,
+                      })
+                    : t('analysis.summary.actionUnit', { index })
                 }
                 onClick={() => onActionClick?.(index)}
               ></div>
@@ -181,6 +209,7 @@ const ActionItem = ({
   setActionRef?: (id: string, element: HTMLDivElement) => void;
 }) => {
   const citationNav = useCitationNavigation();
+  const { t } = useLocale();
   // Replace local expanded state with shared state from parent
   const highLevelAction = isHighLevel ? (action as HighLevelAction) : null;
   const actionId =
@@ -382,7 +411,9 @@ const ActionItem = ({
 
           {isHighLevel && (
             <span className="text-xs text-muted-foreground">
-              {(action as HighLevelAction).action_unit_indices.length} sub-steps
+              {t('analysis.summary.subSteps', {
+                count: (action as HighLevelAction).action_unit_indices.length,
+              })}
             </span>
           )}
 
@@ -399,14 +430,16 @@ const ActionItem = ({
                     </span>
                   </TooltipTrigger>
                   <TooltipContent className="text-xs">
-                    Contains {TYPE_STYLES[moment.category].label}
+                    {t('analysis.summary.containsObservation', {
+                      label: getObservationLabel(moment.category, t),
+                    })}
                   </TooltipContent>
                 </Tooltip>
               ))}
               {actionMoments.length > 3 && (
                 <span
                   className="w-4 h-4 rounded-full bg-accent text-muted-foreground flex items-center justify-center text-xs"
-                  title="More interesting moments"
+                  title={t('analysis.summary.moreInterestingMoments')}
                 >
                   +{actionMoments.length - 3}
                 </span>
@@ -436,7 +469,7 @@ const ActionItem = ({
                     </div>
                   </TooltipTrigger>
                   <TooltipContent className="text-xs">
-                    {TYPE_STYLES[moment.category].label}
+                    {getObservationLabel(moment.category, t)}
                   </TooltipContent>
                 </Tooltip>
                 <div className="text-xs text-muted-foreground">
@@ -478,8 +511,14 @@ interface AgentSummaryComponent extends React.FC<AgentSummaryProps> {
   ) => void;
 }
 
-const getTranscriptSummaryLabel = (summary: TranscriptActionsSummary) =>
-  summary.transcript_name?.trim() || `Transcript ${summary.transcript_idx + 1}`;
+const getTranscriptSummaryLabel = (
+  summary: TranscriptActionsSummary,
+  t: Translator
+) =>
+  summary.transcript_name?.trim() ||
+  t('analysis.summary.transcriptNumber', {
+    number: summary.transcript_idx + 1,
+  });
 
 const TranscriptStatusIcon = ({
   status,
@@ -502,6 +541,7 @@ const AgentSummary: React.FC<AgentSummaryProps> = ({
   agentRunId,
 }) => {
   const dispatch = useAppDispatch();
+  const { t } = useLocale();
 
   const actionsSummary = useAppSelector(
     (state) => state.transcript?.actionsSummary
@@ -696,12 +736,12 @@ const AgentSummary: React.FC<AgentSummaryProps> = ({
   const orphanedLowLevelActions = getOrphanedLowLevelActions();
   const hasHighLevelActions = Boolean(
     selectedTranscriptSummary?.high_level &&
-      selectedTranscriptSummary.high_level.length > 0
+    selectedTranscriptSummary.high_level.length > 0
   );
   const hasOrphanedLowLevelActions = orphanedLowLevelActions.length > 0;
   const hasSelectedLowLevelActions = Boolean(
     selectedTranscriptSummary?.low_level &&
-      selectedTranscriptSummary.low_level.length > 0
+    selectedTranscriptSummary.low_level.length > 0
   );
   const selectedTranscriptIsLoading =
     selectedTranscriptSummary?.status === 'pending' ||
@@ -719,14 +759,13 @@ const AgentSummary: React.FC<AgentSummaryProps> = ({
         <div className="space-y-2">
           <div className="flex flex-col">
             <h4 className="text-sm flex items-center font-semibold">
-              Actions Taken by the Agent
+              {t('analysis.summary.actionsTitle')}
               {loadingActionsSummaryForTranscriptId === agentRunId && (
                 <Loader2 className="ml-2 h-4 w-4 animate-spin text-muted-foreground" />
               )}
             </h4>
             <span className="text-xs text-muted-foreground">
-              Click on an action to see an analysis of notable moments. Expand
-              blocks to see a breakdown.
+              {t('analysis.summary.actionsDescription')}
             </span>
           </div>
           {actionsSummary && hasMultipleTranscriptSummaries && (
@@ -745,11 +784,13 @@ const AgentSummary: React.FC<AgentSummaryProps> = ({
                         ? 'border-primary bg-secondary text-primary'
                         : 'border-border text-muted-foreground hover:bg-secondary'
                     )}
-                    title={getTranscriptSummaryLabel(summary)}
-                    onClick={() => setSelectedTranscriptId(summary.transcript_id)}
+                    title={getTranscriptSummaryLabel(summary, t)}
+                    onClick={() =>
+                      setSelectedTranscriptId(summary.transcript_id)
+                    }
                   >
                     <span className="truncate">
-                      {getTranscriptSummaryLabel(summary)}
+                      {getTranscriptSummaryLabel(summary, t)}
                     </span>
                     <TranscriptStatusIcon status={summary.status} />
                   </button>
@@ -770,7 +811,7 @@ const AgentSummary: React.FC<AgentSummaryProps> = ({
             <div className="relative pb-2">
               {selectedTranscriptSummary?.status === 'error' && (
                 <div className="mb-2 rounded-sm border border-red-text/30 bg-background p-2 text-sm text-red-text">
-                  Failed to analyze this transcript
+                  {t('analysis.summary.failedTranscript')}
                   {selectedTranscriptSummary.error
                     ? `: ${selectedTranscriptSummary.error}`
                     : '.'}
@@ -802,7 +843,7 @@ const AgentSummary: React.FC<AgentSummaryProps> = ({
                   {hasHighLevelActions && (
                     <div className="my-3 border-t border-border pt-3">
                       <h5 className="text-sm font-medium text-muted-foreground mb-2">
-                        Additional Low-Level Actions
+                        {t('analysis.summary.additionalLowLevelActions')}
                       </h5>
                     </div>
                   )}
@@ -829,19 +870,23 @@ const AgentSummary: React.FC<AgentSummaryProps> = ({
                 !hasOrphanedLowLevelActions &&
                 selectedTranscriptSummary.low_level.length > 0 && (
                   <>
-                    {selectedTranscriptSummary.low_level.map((lowLevelAction) => (
-                      <ActionItem
-                        key={lowLevelAction.action_unit_idx}
-                        action={lowLevelAction}
-                        isHighLevel={false}
-                        agentRunId={agentRunId}
-                        transcriptIdx={selectedTranscriptSummary.transcript_idx}
-                        observations={selectedTranscriptSummary.observations}
-                        expandedActions={expandedActions}
-                        setExpandedActions={setExpandedActions}
-                        setActionRef={setActionRef}
-                      />
-                    ))}
+                    {selectedTranscriptSummary.low_level.map(
+                      (lowLevelAction) => (
+                        <ActionItem
+                          key={lowLevelAction.action_unit_idx}
+                          action={lowLevelAction}
+                          isHighLevel={false}
+                          agentRunId={agentRunId}
+                          transcriptIdx={
+                            selectedTranscriptSummary.transcript_idx
+                          }
+                          observations={selectedTranscriptSummary.observations}
+                          expandedActions={expandedActions}
+                          setExpandedActions={setExpandedActions}
+                          setActionRef={setActionRef}
+                        />
+                      )
+                    )}
                   </>
                 )}
 
@@ -851,7 +896,7 @@ const AgentSummary: React.FC<AgentSummaryProps> = ({
                 !selectedTranscriptIsLoading &&
                 selectedTranscriptSummary.low_level.length === 0 && (
                   <div className="bg-background rounded-sm p-2 shadow-sm border border-border text-muted-foreground text-sm">
-                    No actions available for this agent run.
+                    {t('analysis.summary.noActions')}
                   </div>
                 )}
             </div>

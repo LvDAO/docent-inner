@@ -30,6 +30,10 @@ from docent._log_util.logger import get_logger
 from docent.data_models.agent_run import AgentRun, FilterableField
 from docent.data_models.transcript import Transcript
 from docent.loaders import load_inspect
+from docent_core._llm_util.localization import (
+    get_user_preferred_locale,
+    response_locale_context,
+)
 from docent_core._llm_util.providers.preferences import get_supported_model_api_key_providers
 from docent_core._server._analytics.posthog import AnalyticsClient
 from docent_core._server._auth.session import (
@@ -51,9 +55,11 @@ from docent_core.docent.db.filters import (
     ComplexFilter,
 )
 from docent_core.docent.db.schemas.auth_models import (
+    DEFAULT_PREFERRED_LOCALE,
     Permission,
     ResourceType,
     SubjectType,
+    SupportedLocale,
     User,
 )
 from docent_core.docent.db.schemas.collab_models import CollectionCollaborator
@@ -100,6 +106,7 @@ class UserCreateRequest(BaseModel):
 
     email: str
     password: str
+    preferred_locale: SupportedLocale = DEFAULT_PREFERRED_LOCALE
 
     class Config:
         extra = "forbid"
@@ -134,7 +141,11 @@ async def signup(
             detail="A user with this email address already exists. Please use the login page.",
         )
 
-    user = await mono_svc.create_user(request.email, request.password)
+    user = await mono_svc.create_user(
+        request.email,
+        request.password,
+        preferred_locale=request.preferred_locale,
+    )
 
     # Create a session for the new user
     session_id = await create_user_session(user.id, response, mono_svc)
@@ -230,6 +241,20 @@ async def get_current_user(request: Request, mono_svc: MonoService = Depends(get
         raise HTTPException(status_code=401, detail="Invalid or expired session")
 
     return user
+
+
+class UpdateUserPreferencesRequest(BaseModel):
+    preferred_locale: SupportedLocale
+
+
+@user_router.patch("/me/preferences", response_model=User)
+async def update_user_preferences(
+    request: UpdateUserPreferencesRequest,
+    user: User = Depends(get_user_anonymous_ok),
+    mono_svc: MonoService = Depends(get_mono_svc),
+):
+    """Update preferences for the current user."""
+    return await mono_svc.update_user_preferred_locale(user.id, request.preferred_locale)
 
 
 @user_router.post("/logout")
@@ -1320,7 +1345,9 @@ class ActionsSummaryPayload(TypedDict):
 def _get_ordered_transcripts(agent_run: AgentRun) -> list[tuple[int, str, Transcript]]:
     transcript_ids_ordered = agent_run.get_transcript_ids_ordered(full_tree=False)
     if not transcript_ids_ordered:
-        return [(idx, transcript.id, transcript) for idx, transcript in enumerate(agent_run.transcripts)]
+        return [
+            (idx, transcript.id, transcript) for idx, transcript in enumerate(agent_run.transcripts)
+        ]
 
     return [
         (transcript_idx, transcript_id, agent_run.transcript_dict[transcript_id])
@@ -1457,6 +1484,7 @@ async def get_actions_summary(
         raise HTTPException(status_code=404, detail=f"AgentRun {agent_run_id} not found")
     if len(agent_run.transcripts) == 0:
         raise HTTPException(status_code=404, detail=f"AgentRun {agent_run_id} has no transcripts")
+    response_locale = get_user_preferred_locale(ctx.user)
 
     # Result variables; hashes prevent updating with identical content multiple times
     ordered_transcripts = _get_ordered_transcripts(agent_run)
@@ -1504,16 +1532,17 @@ async def get_actions_summary(
             nonlocal current_transcript_idx
             current_transcript_idx = transcript_idx
 
-        try:
-            await _summarize_ordered_transcripts_actions(
-                transcript_summaries,
-                ordered_transcripts,
-                _set_current_transcript_idx,
-                _send_payload_if_new,
-            )
-        finally:
-            # At the very end, close the recv_stream
-            await send_stream.aclose()
+        with response_locale_context(response_locale):
+            try:
+                await _summarize_ordered_transcripts_actions(
+                    transcript_summaries,
+                    ordered_transcripts,
+                    _set_current_transcript_idx,
+                    _send_payload_if_new,
+                )
+            finally:
+                # At the very end, close the recv_stream
+                await send_stream.aclose()
 
     return StreamingResponse(
         sse_stream(_execute, send_stream, recv_stream), media_type="text/event-stream"
