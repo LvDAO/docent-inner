@@ -43,7 +43,7 @@ Open [http://localhost:3001](http://localhost:3001).
 | Variable                         | Required | Purpose                                                                                                                           |
 | -------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | `DOCENT_INTERNAL_API_HOST`       | No       | Backend origin used by Next.js server requests and the `/rest` proxy. Defaults to `http://localhost:8888`. Do not append `/rest`. |
-| `NEXT_PUBLIC_API_HOST`           | No       | Public backend origin for explicit cross-origin mode. Leave unset for same-origin browser requests.                               |
+| `NEXT_PUBLIC_API_HOST`           | No       | Public backend origin for explicit cross-origin mode and server-side fallback when no internal host is set.                       |
 | `NEXT_PUBLIC_INTERNAL_API_HOST`  | No       | Deprecated compatibility alias for `DOCENT_INTERNAL_API_HOST`.                                                                    |
 | `NEXT_PUBLIC_POSTHOG_API_KEY`    | No       | Enables PostHog when configured.                                                                                                  |
 | `NEXT_PUBLIC_POSTHOG_API_HOST`   | No       | Overrides the PostHog host.                                                                                                       |
@@ -93,4 +93,4 @@ There is no component-test suite yet. `test:config` covers proxy configuration; 
 
 ## Container routing
 
-`Dockerfile.frontend` uses the tracked `bun.lock` and bakes the `/rest` rewrite destination into the standalone Next.js build. Docker Compose supplies `http://backend:$DOCENT_SERVER_PORT` as both the build-time and runtime `DOCENT_INTERNAL_API_HOST`; custom image builds must provide the backend origin reachable from the frontend container.
+`Dockerfile.frontend` uses the tracked `bun.lock` and bakes the `/rest` rewrite destination into the standalone Next.js build. Docker Compose supplies `http://backend:$DOCENT_SERVER_PORT` as both the build-time and runtime `DOCENT_INTERNAL_API_HOST`. Custom same-origin builds should provide an internal backend origin reachable from the frontend container; explicit cross-origin builds can instead provide only `NEXT_PUBLIC_API_HOST`, which also becomes the server-side and proxy fallback.

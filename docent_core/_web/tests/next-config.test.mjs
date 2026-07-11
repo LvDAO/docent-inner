@@ -15,3 +15,18 @@ test('proxies the complete REST tree to the internal backend', async () => {
   assert.equal(config.experimental.proxyClientMaxBodySize, '50mb');
   assert.equal(config.experimental.proxyTimeout, 86_400_000);
 });
+
+test('falls back to the public backend for cross-origin builds', async () => {
+  delete process.env.DOCENT_INTERNAL_API_HOST;
+  delete process.env.NEXT_PUBLIC_INTERNAL_API_HOST;
+  process.env.NEXT_PUBLIC_API_HOST = 'https://api.example.com/';
+  const { default: config } =
+    await import('../next.config.mjs?public-proxy-test');
+
+  assert.deepEqual(await config.rewrites(), [
+    {
+      source: '/rest/:path*',
+      destination: 'https://api.example.com/rest/:path*',
+    },
+  ]);
+});

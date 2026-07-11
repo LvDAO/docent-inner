@@ -113,7 +113,7 @@ Docent uses same-origin Web/API routing by default, so normal self-hosted browse
 * `DOCENT_INTERNAL_API_HOST`: Backend origin used by the Next.js server and its `/rest` proxy.
     * `docent_core web --backend-url ...` and Docker Compose set this automatically.
     * When running Bun directly, set it to the backend address reachable from the Next.js process, without a trailing `/rest`.
-* `NEXT_PUBLIC_API_HOST`: Optional public backend origin for explicit cross-origin deployments. Leave it unset for the default same-origin mode.
+* `NEXT_PUBLIC_API_HOST`: Optional public backend origin for explicit cross-origin deployments. When no internal host is set, Next.js also uses this origin for server-side requests and the `/rest` proxy. Leave it unset for the default same-origin mode.
 * `NEXT_PUBLIC_INTERNAL_API_HOST`: Deprecated compatibility alias for `DOCENT_INTERNAL_API_HOST`.
 
 ## Optional variables for deployed environments
