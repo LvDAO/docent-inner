@@ -1,8 +1,8 @@
 # Docent web application
 
-This directory contains Docent's Next.js App Router frontend. It renders the collection, transcript, rubric, chart, Hodoscope, onboarding, and settings experiences and communicates directly with the Docent `/rest` API.
+This directory contains Docent's Next.js App Router frontend. It renders the collection, transcript, rubric, chart, Hodoscope, onboarding, and settings experiences and proxies same-origin `/rest` requests to the Docent backend.
 
-The frontend is not useful by itself: a compatible Docent backend must be running and reachable from both the browser and Next.js server-side code.
+The frontend is not useful by itself: a compatible Docent backend must be running and reachable from the Next.js process. The browser only needs the Web origin.
 
 For the CLI path, first install the root Python environment with `uv sync --extra dev`. Direct frontend work requires Bun and the tracked `bun.lock`.
 
@@ -25,15 +25,14 @@ uv run docent_core web \
   --backend-url http://localhost:8889
 ```
 
-The CLI changes into this directory, installs dependencies with Bun, sets both backend URL variables, and starts the Next.js development server.
+The CLI changes into this directory, installs dependencies with Bun, sets the private proxy target, and starts the Next.js development server. Browser REST, upload, authentication, and SSE requests stay on `http://localhost:3001/rest/...`.
 
 ## Start directly with Bun
 
 ```bash
 cd docent_core/_web
 bun install --frozen-lockfile
-NEXT_PUBLIC_API_HOST=http://localhost:8889 \
-NEXT_PUBLIC_INTERNAL_API_HOST=http://localhost:8889 \
+DOCENT_INTERNAL_API_HOST=http://localhost:8889 \
 bun run dev -- --port 3001
 ```
 
@@ -41,18 +40,19 @@ Open [http://localhost:3001](http://localhost:3001).
 
 ## Environment variables
 
-| Variable | Required | Purpose |
-| --- | --- | --- |
-| `NEXT_PUBLIC_API_HOST` | Yes | Public backend origin used by browser API, RTK Query, and SSE requests. Do not append `/rest`. |
-| `NEXT_PUBLIC_INTERNAL_API_HOST` | No | Backend origin used by server-side rendering and middleware. Defaults to the public origin. Use an internal service name in container deployments. |
-| `NEXT_PUBLIC_POSTHOG_API_KEY` | No | Enables PostHog when configured. |
-| `NEXT_PUBLIC_POSTHOG_API_HOST` | No | Overrides the PostHog host. |
-| `NEXT_PUBLIC_SENTRY_DSN` | No | Enables browser-side Sentry reporting. |
-| `NEXT_PUBLIC_SENTRY_ENVIRONMENT` | No | Labels the Sentry environment. |
+| Variable                         | Required | Purpose                                                                                                                           |
+| -------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `DOCENT_INTERNAL_API_HOST`       | No       | Backend origin used by Next.js server requests and the `/rest` proxy. Defaults to `http://localhost:8888`. Do not append `/rest`. |
+| `NEXT_PUBLIC_API_HOST`           | No       | Public backend origin for explicit cross-origin mode and server-side fallback when no internal host is set.                       |
+| `NEXT_PUBLIC_INTERNAL_API_HOST`  | No       | Deprecated compatibility alias for `DOCENT_INTERNAL_API_HOST`.                                                                    |
+| `NEXT_PUBLIC_POSTHOG_API_KEY`    | No       | Enables PostHog when configured.                                                                                                  |
+| `NEXT_PUBLIC_POSTHOG_API_HOST`   | No       | Overrides the PostHog host.                                                                                                       |
+| `NEXT_PUBLIC_SENTRY_DSN`         | No       | Enables browser-side Sentry reporting.                                                                                            |
+| `NEXT_PUBLIC_SENTRY_ENVIRONMENT` | No       | Labels the Sentry environment.                                                                                                    |
 
-The browser calls `${NEXT_PUBLIC_API_HOST}/rest` directly; there is no Next.js API rewrite that hides the backend. When the frontend and backend use different origins, configure the backend's `DOCENT_CORS_ORIGINS` and keep credentialed cookie requests in mind.
+By default, the browser calls `/rest` on the Web origin and Next.js transparently proxies the request to `DOCENT_INTERNAL_API_HOST`. Only the Web port needs to be exposed or forwarded. Use `docent_core web --cross-origin` and `NEXT_PUBLIC_API_HOST` only when the browser must call a separately published backend.
 
-Both backend variables use the `NEXT_PUBLIC_` prefix. Treat them as public configuration and never place credentials or secret query parameters in either value. The public API host is embedded in production client assets at build time.
+`DOCENT_INTERNAL_API_HOST` must be a plain trusted origin without credentials or a `/rest` suffix. `NEXT_PUBLIC_API_HOST` is embedded in production client assets when cross-origin mode is enabled; never put credentials or secret query parameters in it.
 
 ## Project layout
 
@@ -84,13 +84,13 @@ The catalog types make a missing Chinese key a TypeScript error.
 cd docent_core/_web
 bun run lint
 bunx tsc --noEmit
-NEXT_PUBLIC_API_HOST=http://localhost:8889 \
-NEXT_PUBLIC_INTERNAL_API_HOST=http://localhost:8889 \
+DOCENT_INTERNAL_API_HOST=http://localhost:8889 \
 bun run build
+bun run test:config
 ```
 
-There is currently no frontend test script in `package.json`; lint, TypeScript, and the production build are the available repository checks.
+There is no component-test suite yet. `test:config` covers proxy configuration; lint, TypeScript, and the production build cover the application surface.
 
-## Container-build limitation
+## Container routing
 
-`Dockerfile.frontend` currently runs `npm ci`, but this repository tracks `bun.lock` and does not track `package-lock.json`. A clean frontend Docker build is therefore not reproducible until the Dockerfile and canonical lockfile are aligned. Local development and validation should use Bun.
+`Dockerfile.frontend` uses the tracked `bun.lock` and bakes the `/rest` rewrite destination into the standalone Next.js build. Docker Compose supplies `http://backend:$DOCENT_SERVER_PORT` as both the build-time and runtime `DOCENT_INTERNAL_API_HOST`. Custom same-origin builds should provide an internal backend origin reachable from the frontend container; explicit cross-origin builds can instead provide only `NEXT_PUBLIC_API_HOST`, which also becomes the server-side and proxy fallback.

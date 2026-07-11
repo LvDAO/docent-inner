@@ -61,7 +61,7 @@ For a self-hosted deployment, pass service origins without a trailing `/rest` pa
 
 ```python
 client = Docent(
-    server_url="http://localhost:8889",
+    server_url="http://localhost:3001",
     web_url="http://localhost:3001",
     api_key=os.environ["DOCENT_API_KEY"],
 )
@@ -107,7 +107,7 @@ agent_run = AgentRun(
 writer = docent.init(
     collection_name="Background uploads",
     # For self-hosted Docent:
-    # server_url="http://localhost:8889",
+    # server_url="http://localhost:3001",
     # web_url="http://localhost:3001",
     # api_key=os.environ["DOCENT_API_KEY"],
 )

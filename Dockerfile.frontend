@@ -1,3 +1,5 @@
+ARG DOCENT_INTERNAL_API_HOST
+
 FROM oven/bun:1.3.14-alpine AS deps
 
 # Install dependencies from the repository's Bun lockfile.
@@ -13,9 +15,11 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY docent_core/_web ./
 
-# Set build argument for API host (used by production builds)
+# Configure same-origin API proxying for the production build.
 ARG NEXT_PUBLIC_API_HOST
+ARG DOCENT_INTERNAL_API_HOST
 ENV NEXT_PUBLIC_API_HOST=${NEXT_PUBLIC_API_HOST}
+ENV DOCENT_INTERNAL_API_HOST=${DOCENT_INTERNAL_API_HOST}
 
 # Build the application
 RUN bun run build
@@ -24,7 +28,9 @@ RUN bun run build
 FROM node:22-alpine AS runner
 WORKDIR /app
 
+ARG DOCENT_INTERNAL_API_HOST
 ENV NODE_ENV=production
+ENV DOCENT_INTERNAL_API_HOST=${DOCENT_INTERNAL_API_HOST}
 # Disable telemetry during build
 ENV NEXT_TELEMETRY_DISABLED=1
 

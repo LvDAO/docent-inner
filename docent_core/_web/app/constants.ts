@@ -1,16 +1,19 @@
 /**
- * BASE_URL is the public URL of the Docent API server.
- * INTERNAL_BASE_URL is the URL of the Docent API server that is used for server-side requests.
- * These are usually the same, but if the API server is inaccessible from the frontend deployment at the BASE_URL, then we need a separate INTERNAL_BASE_URL.
- * For example, this is required for the Docker Compose setup.
+ * Browser requests use the current origin by default and are proxied by Next.js.
+ * NEXT_PUBLIC_API_HOST remains available for explicitly cross-origin deployments.
+ * DOCENT_INTERNAL_API_HOST is only used by Next.js server-side requests.
  */
 
-export const BASE_URL = process.env.NEXT_PUBLIC_API_HOST;
-if (!BASE_URL) {
-  throw new Error('NEXT_PUBLIC_API_HOST is not set');
-}
+const normalizeBaseUrl = (value: string | undefined): string =>
+  value?.replace(/\/+$/, '') ?? '';
+
+export const BASE_URL = normalizeBaseUrl(process.env.NEXT_PUBLIC_API_HOST);
 export const INTERNAL_BASE_URL =
-  process.env.NEXT_PUBLIC_INTERNAL_API_HOST || BASE_URL;
+  normalizeBaseUrl(
+    process.env.DOCENT_INTERNAL_API_HOST ||
+      process.env.NEXT_PUBLIC_INTERNAL_API_HOST ||
+      process.env.NEXT_PUBLIC_API_HOST
+  ) || 'http://localhost:8888';
 
 export const BASE_DOCENT_PATH = '/dashboard';
 

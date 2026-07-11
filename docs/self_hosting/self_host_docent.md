@@ -25,7 +25,7 @@ DOCENT_LLM_PRO_MODEL=deepseek-v4-pro
 For a custom OpenAI-compatible endpoint, set `DOCENT_LLM_PROVIDER=custom`, provide your `DOCENT_LLM_BASE_URL`, and set the model variables you want each Docent feature to use. See [LLM calls](./environment_variables.md#llm-calls) for the per-feature model list.
 
 !!! note
-    If you're self-hosting Docent anywhere other than `localhost`, make sure to set the frontend URL as a CORS origin; e.g., `DOCENT_CORS_ORIGINS=http://domain:3001`.
+    The Web UI and `/rest` API use one origin by default. Configure `DOCENT_CORS_ORIGINS` only if you explicitly run the Web CLI with `--cross-origin` or put the API on a separate public origin.
 
 ### 2. Start the backend server and frontend UI
 
@@ -37,17 +37,15 @@ Docker Compose is the easiest way to get started, but you may want a manual inst
 
     === "As non-root"
         ```bash
-        DOCENT_HOST=http://localhost DOCENT_SERVER_PORT=8889 DOCENT_WEB_PORT=3001 docker compose up --build
+        DOCENT_SERVER_PORT=8889 DOCENT_WEB_PORT=3001 docker compose up --build
         ```
 
     === "As root"
         ```bash
-        # Note that `sudo` strips environment variables, so you have to set them *inside* the command.
-        sudo DOCENT_HOST=http://localhost DOCENT_SERVER_PORT=8889 DOCENT_WEB_PORT=3001 docker compose up --build
+        sudo env DOCENT_SERVER_PORT=8889 DOCENT_WEB_PORT=3001 docker compose up --build
         ```
 
-    !!! note
-        If you're not using `localhost`, make sure `DOCENT_HOST` is set to the correct domain. Ensure that it's **prefixed correctly** with `http://` or `https://`.
+    `DOCENT_SERVER_PORT` is internal to the Compose network. `DOCENT_WEB_PORT` is the single application port published on the host.
 
     Cold build + start should take a few minutes. Once finished, you can run
 
@@ -61,14 +59,17 @@ Docker Compose is the easiest way to get started, but you may want a manual inst
         sudo docker ps
         ```
 
-    to check that the four following containers are running:
+    to check that the five services are running. The application port layout should look like this:
     ```bash
-    CONTAINER ID   IMAGE             COMMAND                  CREATED          STATUS          PORTS                                         NAMES
-    b8bba5b86251   docent-backend    "bash -c 'bash /app/…"   34 seconds ago   Up 33 seconds   0.0.0.0:8889->8889/tcp, [::]:8889->8889/tcp   docent_backend
-    0cfc73d80407   docent-frontend   "docent web --build …"   34 seconds ago   Up 33 seconds   0.0.0.0:3001->3001/tcp, [::]:3001->3001/tcp   docent_frontend
-    c80f4302db12   postgres:15       "docker-entrypoint.s…"   34 seconds ago   Up 33 seconds   0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp   docent_postgres
-    f9d86be37643   redis:alpine      "docker-entrypoint.s…"   34 seconds ago   Up 33 seconds   0.0.0.0:6379->6379/tcp, [::]:6379->6379/tcp   docent_redis
+    NAME               PORTS
+    docent_backend     8889/tcp
+    docent_frontend    0.0.0.0:3001->3000/tcp, [::]:3001->3000/tcp
+    docent_postgres    0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp
+    docent_redis       0.0.0.0:6379->6379/tcp, [::]:6379->6379/tcp
+    docent_worker
     ```
+
+    Open `http://localhost:3001`. For a remote host or SSH tunnel, expose or forward only `DOCENT_WEB_PORT`; browser API, uploads, authentication, and streaming requests use the same port under `/rest`.
 
     To shut Docent down, either press `Ctrl+C` in the terminal or run:
 
@@ -158,9 +159,9 @@ Docker Compose is the easiest way to get started, but you may want a manual inst
         docent_core web --port 3001 --backend-url http://localhost:8889
         ```
 
-    to start the frontend. You may need to [install Bun](https://bun.com/docs/installation) first.
+    to start the frontend. The `--backend-url` value is the private proxy target; the browser still uses `http://localhost:3001/rest/...`. You may need to [install Bun](https://bun.com/docs/installation) first.
 
-Finally, try accessing the Docent UI at `http://$DOCENT_HOST:$DOCENT_WEB_PORT`.
+Finally, try accessing the Docent UI at `http://localhost:3001`.
 
 ### 3. Customize the Docent client
 
@@ -170,9 +171,10 @@ When creating `Docent` client objects, you'll need to specify custom server and 
 import os
 from docent import Docent
 
+docent_url = "http://localhost:3001"
 client = Docent(
-    server_url="http://localhost:8889",    # or your own server URL
-    frontend_url="http://localhost:3001",  # or your own frontend URL
+    server_url=docent_url,
+    web_url=docent_url,
     api_key=os.getenv("DOCENT_API_KEY"),
 )
 ```
