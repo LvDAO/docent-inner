@@ -1,8 +1,6 @@
 import { ThemeProvider } from '@/components/theme-provider';
 import type { Metadata } from 'next';
-import { Open_Sans, JetBrains_Mono } from 'next/font/google';
 import { cookies, headers } from 'next/headers';
-import { cn } from '@/lib/utils';
 
 import { ReduxProvider, CSPostHogProvider } from './providers';
 import { Toaster } from '@/components/ui/toaster';
@@ -19,18 +17,6 @@ import {
 } from '@/lib/i18n/locales';
 
 import './globals.css';
-
-const openSans = Open_Sans({
-  subsets: ['latin'],
-  display: 'swap',
-  variable: '--font-open-sans',
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ['latin'],
-  display: 'swap',
-  variable: '--font-jetbrains-mono',
-});
 
 export const metadata: Metadata = {
   title: 'Docent',
@@ -58,9 +44,7 @@ export default async function RootLayout({
 
   return (
     <html lang={initialLocale} className="h-full" suppressHydrationWarning>
-      <body
-        className={`h-full ${cn(openSans.className, jetbrainsMono.variable)}`}
-      >
+      <body className="h-full">
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

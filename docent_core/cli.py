@@ -25,8 +25,8 @@ def _run_worker_process(worker_id: int) -> None:
 @app.command(help="Run the server")
 def server(
     host: str = typer.Option("0.0.0.0", help="Host address to bind to"),
-    port: int = typer.Option(8888, help="Port to bind to"),
-    workers: int = typer.Option(1, help="Number of worker processes"),
+    port: int = typer.Option(8888, min=1, max=65535, help="Port to bind to"),
+    workers: int = typer.Option(1, min=1, help="Number of worker processes"),
     reload: bool = typer.Option(False, help="Enable auto-reload on code changes"),
     timeout_graceful_shutdown: int | None = typer.Option(
         None, help="Timeout in seconds for graceful shutdown when reloading"
@@ -38,12 +38,7 @@ def server(
 
     # Run the server with appropriate arguments
     cmd = ["uvicorn", "docent_core._server.api:asgi_app"]
-    if host:
-        cmd.extend(["--host", host])
-    if port:
-        cmd.extend(["--port", str(port)])
-    if workers:
-        cmd.extend(["--workers", str(workers)])
+    cmd.extend(["--host", host, "--port", str(port), "--workers", str(workers)])
     if reload:
         cmd.append("--reload")
     if timeout_graceful_shutdown is not None:
@@ -54,7 +49,7 @@ def server(
 
 @app.command(help="Run a background job runner worker")
 def worker(
-    workers: int = typer.Option(1, help="Number of worker processes"),
+    workers: int = typer.Option(1, min=1, help="Number of worker processes"),
 ):
     from docent_core._worker import worker as docent_worker
 
@@ -126,7 +121,7 @@ def web(
         "--same-origin/--cross-origin",
         help="Proxy browser API requests through the web origin",
     ),
-    port: int = typer.Option(3000, help="Port to bind to"),
+    port: int = typer.Option(3000, min=1, max=65535, help="Port to bind to"),
     build: bool = typer.Option(False, help="Build the web app"),
     install: bool = typer.Option(True, help="Install dependencies"),
 ):

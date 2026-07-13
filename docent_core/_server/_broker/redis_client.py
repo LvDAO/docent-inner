@@ -2,12 +2,11 @@ import json
 from typing import Any
 
 import anyio
-import redis.asyncio as redis
-from arq import ArqRedis
+from arq import ArqRedis, create_pool
 from fastapi.encoders import jsonable_encoder
 
 from docent._log_util import get_logger
-from docent_core._env_util import ENV
+from docent_core._redis_config import get_redis_settings
 from docent_core._worker.constants import WORKER_QUEUE_NAME
 from docent_core.docent.db.contexts import ViewContext
 
@@ -21,31 +20,21 @@ STREAM_KEY_FORMAT = "stream_{job_id}"
 STATE_KEY_FORMAT = "state_{job_id}"
 
 
-async def get_redis_client():
+async def get_redis_client() -> ArqRedis:
     global _redis_client
 
     async with _redis_lock:
         if _redis_client is None:
-            REDIS_HOST = ENV.get("DOCENT_REDIS_HOST")
-            REDIS_PORT = ENV.get("DOCENT_REDIS_PORT")
-            REDIS_USER = ENV.get("DOCENT_REDIS_USER")
-            REDIS_PASSWORD = ENV.get("DOCENT_REDIS_PASSWORD")
-            REDIS_TLS = ENV.get("DOCENT_REDIS_TLS", "false").strip().lower() == "true"
+            redis_settings = get_redis_settings()
+            _redis_client = await create_pool(redis_settings)
 
-            if REDIS_HOST is None or REDIS_PORT is None:
-                raise ValueError("DOCENT_REDIS_HOST, DOCENT_REDIS_PORT must be set")
-
-            redis_protocol = "rediss" if REDIS_TLS else "redis"
-            REDIS_USER_STRING = (
-                f"{REDIS_USER}:{REDIS_PASSWORD}@"
-                if REDIS_USER is not None and REDIS_PASSWORD is not None
-                else ""
+            protocol = "rediss" if redis_settings.ssl else "redis"
+            logger.info(
+                "Checking Redis connection to %s://%s:%s",
+                protocol,
+                redis_settings.host,
+                redis_settings.port,
             )
-            url = f"{redis_protocol}://{REDIS_USER_STRING}{REDIS_HOST}:{REDIS_PORT}"
-
-            _redis_client = ArqRedis(connection_pool=redis.ConnectionPool.from_url(url, decode_responses=True))  # type: ignore
-
-            logger.info(f"Checking Redis connection to {url}")
             await verify_redis_connection(_redis_client)
 
         return _redis_client
@@ -82,9 +71,8 @@ async def publish_to_broker(collection_id: str | None, data: dict[str, Any]):
     redis_client = await get_redis_client()
 
     channel = f"collection:{collection_id}" if collection_id is not None else "general:general"
-    print(f"Publishing to channel {channel}!!!!!!")
+    logger.debug("Publishing to channel %s", channel)
     await redis_client.publish(channel, json.dumps(jsonable_encoder(data)))  # type: ignore
-    print(f"Published to channel {channel}!!!!!!")
 
 
 async def publish_collection_update(collection_id: str, payload: dict[str, Any]):
@@ -126,7 +114,7 @@ async def publish_view_update(collection_id: str, view_id: str, payload: dict[st
 async def _enqueue_job(queue_name: str, func_name: str, *args: Any, **kwargs: Any) -> None:
     redis_client = await get_redis_client()
     j = await redis_client.enqueue_job(func_name, *args, _queue_name=queue_name, **kwargs)
-    print(f"Enqueued job {j} to {queue_name} with func {func_name}")
+    logger.debug("Enqueued job %s to %s with function %s", j, queue_name, func_name)
 
 
 async def enqueue_job(view_ctx: ViewContext, job_id: str) -> None:

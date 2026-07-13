@@ -1,4 +1,4 @@
-import { cookies, headers } from 'next/headers';
+import { cookies } from 'next/headers';
 import DocentDashboardClientLayout, {
   NotFoundPage,
   PermissionDeniedPage,
@@ -20,17 +20,8 @@ export default async function DocentDashboardLayout({
   const { collection_id: collectionId } = await params;
 
   try {
-    // Check for middleware-provided cookies first, then fall back to actual cookies
-    const headerStore = await headers();
-    const middlewareCookies = headerStore.get('x-middleware-cookies');
-
-    let cookieString: string;
-    if (middlewareCookies) {
-      cookieString = middlewareCookies;
-    } else {
-      const cookieStore = await cookies();
-      cookieString = cookieStore.toString();
-    }
+    const cookieStore = await cookies();
+    const cookieString = cookieStore.toString();
 
     const permissions = await serverPermissionsService.getUserPermissions(
       collectionId,

@@ -1693,6 +1693,8 @@ class MonoService:
             elif subject_type == SubjectType.PUBLIC:
                 subject_filter = SQLAAccessControlEntry.is_public
                 subject_fields = {"user_id": None, "organization_id": None, "is_public": True}
+            else:
+                raise ValueError(f"Unsupported subject type: {subject_type}")
 
             # Check if any permission already exists for this subject/resource combination
             result = await session.execute(
@@ -1710,8 +1712,6 @@ class MonoService:
                 )
 
                 session.add(acl_entry)
-            print("SUBJECT_FIELDS", subject_fields)
-            print("RESOURCE_FIELDS", resource_fields)
             # Set the fields
             for field, value in subject_fields.items():
                 setattr(acl_entry, field, value)

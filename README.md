@@ -93,6 +93,26 @@ Docent supports English and Simplified Chinese (`zh-CN`). Choose **Settings → 
 
 Language changes do not rewrite uploaded transcripts, metadata, quoted source material, or existing analysis results. See [Language settings](docs/user_settings/language.md) for the exact boundary.
 
+## Self-host with Docker
+
+The repository provides one deployment command and one user-edited configuration file. Install Docker Engine with Docker Compose v2, clone the repository, then run:
+
+```bash
+./deploy.sh
+```
+
+On the first run, the script creates `.env` with mode `600` and stops. Replace every `<...>` placeholder in that file, review the Web port, model endpoints, credentials, and worker limits, then run `./deploy.sh` again.
+
+The script validates the Compose configuration, builds the images, applies Alembic migrations, waits for Postgres, Redis, the API, and the Web UI, then prints the published frontend address. The default application URL is [http://localhost:3000](http://localhost:3000); Postgres and Redis bind only to `127.0.0.1`.
+
+Stop the stack without deleting its database volume:
+
+```bash
+docker compose down
+```
+
+See [Self-host Docent](docs/self_hosting/self_host_docent.md) for local-model networking, upgrades, logs, and manual development.
+
 ## Run Docent locally from source
 
 This is the supported development and evaluation path in the current checkout; it is not a production deployment recipe. It runs Postgres and Redis in containers and runs the API, worker, and web application from the repository.

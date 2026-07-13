@@ -1,50 +1,78 @@
 include:
   - docker-compose-db.yml
 
+x-backend-service: &backend-service
+  build:
+    context: .
+    dockerfile: Dockerfile.backend
+  env_file:
+    - ${DOCENT_ENV_FILE:-.env}
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  environment:
+    ENV_RESOLUTION_STRATEGY: os_environ
+    DOCENT_PG_HOST: postgres
+    DOCENT_PG_PORT: 5432
+    DOCENT_REDIS_HOST: redis
+    DOCENT_REDIS_PORT: 6379
+    # The bundled Redis uses its default ACL user with an optional password.
+    DOCENT_REDIS_USER: ""
+
 services:
+  migrate:
+    <<: *backend-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+
   backend:
-    build:
-      context: .
-      dockerfile: Dockerfile.backend
-    container_name: docent_backend
-    env_file:
-      - .env
+    <<: *backend-service
     expose:
       - "${DOCENT_SERVER_PORT:-8888}"
     depends_on:
-      - postgres
-      - redis
-    # Uncomment to forward SSH agent to the container
-    # volumes:
-    #   - ${SSH_AUTH_SOCK}:/ssh-agent
-    # environment:
-    #   - SSH_AUTH_SOCK=/ssh-agent
-    environment:
-      - ENV_RESOLUTION_STRATEGY=os_environ
-      - DOCENT_PG_HOST=postgres
-      - DOCENT_PG_PORT=5432
-      - DOCENT_REDIS_HOST=redis
-      - DOCENT_REDIS_PORT=6379
-    command: bash -c "docent_core server --port ${DOCENT_SERVER_PORT:-8888} --workers 8"
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command:
+      - docent_core
+      - server
+      - --port
+      - "${DOCENT_SERVER_PORT:-8888}"
+      - --workers
+      - "${DOCENT_BACKEND_WORKERS:-2}"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen('http://127.0.0.1:${DOCENT_SERVER_PORT:-8888}/rest/ping', timeout=3)
+      interval: 5s
+      timeout: 4s
+      retries: 30
+      start_period: 10s
     restart: unless-stopped
 
   worker:
-    build:
-      context: .
-      dockerfile: Dockerfile.backend
-    container_name: docent_worker
-    env_file:
-      - .env
+    <<: *backend-service
     depends_on:
-      - postgres
-      - redis
-    environment:
-      - ENV_RESOLUTION_STRATEGY=os_environ
-      - DOCENT_PG_HOST=postgres
-      - DOCENT_PG_PORT=5432
-      - DOCENT_REDIS_HOST=redis
-      - DOCENT_REDIS_PORT=6379
-    command: bash -c "docent_core worker --workers 2"
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command:
+      - docent_core
+      - worker
+      - --workers
+      - "${DOCENT_WORKER_PROCESSES:-1}"
     restart: unless-stopped
 
   frontend:
@@ -53,11 +81,24 @@ services:
       dockerfile: Dockerfile.frontend
       args:
         DOCENT_INTERNAL_API_HOST: http://backend:${DOCENT_SERVER_PORT:-8888}
-    container_name: docent_frontend
     ports:
-      - "${DOCENT_WEB_PORT:-3000}:3000"
+      - "${DOCENT_WEB_BIND_ADDRESS:-0.0.0.0}:${DOCENT_WEB_PORT:-3000}:3000"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     environment:
-      - DOCENT_INTERNAL_API_HOST=http://backend:${DOCENT_SERVER_PORT:-8888}
+      DOCENT_INTERNAL_API_HOST: http://backend:${DOCENT_SERVER_PORT:-8888}
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - >-
+          fetch('http://127.0.0.1:3000/health')
+          .then(response => { if (!response.ok) process.exit(1) })
+          .catch(() => process.exit(1))
+      interval: 5s
+      timeout: 4s
+      retries: 30
+      start_period: 10s
     restart: unless-stopped

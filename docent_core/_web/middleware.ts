@@ -5,8 +5,7 @@ import { INTERNAL_BASE_URL } from './app/constants';
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
-  // Check if cookies already have a user associated
-  let user = await getUser();
+  const user = await getUser();
 
   // If not, we might be able to create an anonymous session, if the path contains a collection_id
   if (!user) {
@@ -14,38 +13,26 @@ export async function middleware(request: NextRequest) {
       /^\/dashboard\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(\/.*)?$/i
     );
     if (isCollectionRoute) {
-      // Create an anonymous session
-      const anonResponse = await fetch(
-        `${INTERNAL_BASE_URL}/rest/anonymous_session`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+      try {
+        const anonResponse = await fetch(
+          `${INTERNAL_BASE_URL}/rest/anonymous_session`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+        const setCookie = anonResponse.headers.get('set-cookie');
+        if (anonResponse.ok && setCookie) {
+          // Reissue the request with the new cookie so every layout verifies /rest/me.
+          const response = NextResponse.redirect(request.nextUrl);
+          response.headers.set('set-cookie', setCookie);
+          return response;
         }
-      );
-      const anonData = await anonResponse.json();
-      user = anonData.user; // Extract user from new response format
-
-      // Get the set-cookie header from the anonymous session response
-      const setCookie = anonResponse.headers.get('set-cookie');
-
-      // Create a new response with the cookie and user data in *request* headers
-      // This is necessary for the server-side auth check in layout.tsx to work
-      const response = NextResponse.next({
-        request: {
-          headers: new Headers({
-            ...request.headers,
-            'x-middleware-user': JSON.stringify(user),
-            'x-middleware-cookies': setCookie || '',
-          }),
-        },
-      });
-
-      // Also set the *response* headers so the cookie is sent to the client
-      if (setCookie) response.headers.set('set-cookie', setCookie);
-
-      return response;
+      } catch {
+        // Fall through to the normal signup redirect when the backend is unavailable.
+      }
     }
   }
 

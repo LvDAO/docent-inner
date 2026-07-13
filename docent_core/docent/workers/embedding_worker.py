@@ -5,7 +5,7 @@ import anyio
 from docent._log_util import get_logger
 from docent_core._server._broker.redis_client import publish_collection_update
 from docent_core.docent.db.contexts import ViewContext
-from docent_core.docent.db.schemas.tables import JobStatus, SQLAJob
+from docent_core.docent.db.schemas.tables import SQLAJob
 from docent_core.docent.services.monoservice import MonoService
 
 logger = get_logger(__name__)
@@ -27,10 +27,7 @@ async def compute_embeddings(ctx: ViewContext, job: SQLAJob):
 
     should_index = job.job_json["should_index"]
 
-    await mono_svc.set_job_status(job.id, JobStatus.RUNNING)
-
     # Track completion states
-    errored = False
     embedding_completed = False
     indexing_completed = False
 
@@ -83,61 +80,42 @@ async def compute_embeddings(ctx: ViewContext, job: SQLAJob):
 
     async def _run():
         """Main embedding computation logic"""
-        nonlocal embedding_completed, indexing_completed, errored
+        nonlocal embedding_completed, indexing_completed
 
-        try:
-            async with mono_svc.advisory_lock(ctx.collection_id, action_id="compute_embeddings"):
-                # Compute embeddings
-                embedding_status = await mono_svc.compute_embeddings(ctx, _progress_callback)
+        async with mono_svc.advisory_lock(ctx.collection_id, action_id="compute_embeddings"):
+            embedding_status = await mono_svc.compute_embeddings(ctx, _progress_callback)
+            if not embedding_status:
+                raise RuntimeError("Embedding generation produced no result")
 
-                if not embedding_status:
-                    errored = True
-                    return
+            embedding_completed = True
+            logger.info(f"Embeddings computation completed for job {job.id}")
 
-                embedding_completed = True
-                logger.info(f"Embeddings computation completed for job {job.id}")
-
-                if not should_index:
-                    indexing_completed = True
-                    return
-
-                # Report that we're starting indexing
-                progress_data = {
-                    "indexing_phase": "starting",
-                    "embedding_progress": 100,
-                    "indexing_progress": 0,
-                }
-                # Send via websocket instead of Redis stream
-                await publish_collection_update(
-                    ctx.collection_id,
-                    {"action": "embedding_progress", "payload": progress_data},
-                )
-
-                # Compute index
-                await mono_svc.compute_ivfflat_index(ctx)
+            if not should_index:
                 indexing_completed = True
-                logger.info(f"Indexing completed for job {job.id}")
+                return
 
-        except Exception as e:
-            logger.error(f"Error computing embeddings for job {job.id}: {e}")
-            errored = True
-            raise
+            await publish_collection_update(
+                ctx.collection_id,
+                {
+                    "action": "embedding_progress",
+                    "payload": {
+                        "indexing_phase": "starting",
+                        "embedding_progress": 100,
+                        "indexing_progress": 0,
+                    },
+                },
+            )
 
-        finally:
-            with anyio.CancelScope(shield=True):
-                if errored:
-                    logger.highlight(f"Job {job.id} canceled", color="red")
-                    await mono_svc.set_job_status(job.id, JobStatus.CANCELED)
-                else:
-                    logger.highlight(f"Job {job.id} finished", color="green")
-                    await mono_svc.set_job_status(job.id, JobStatus.COMPLETED)
-                    # Send completion message via websocket
-                    await publish_collection_update(
-                        ctx.collection_id,
-                        {"action": "embedding_complete", "payload": {}},
-                    )
+            await mono_svc.compute_ivfflat_index(ctx)
+            indexing_completed = True
+            logger.info(f"Indexing completed for job {job.id}")
 
     async with anyio.create_task_group() as tg:
         tg.start_soon(_run)
         if should_index:
             tg.start_soon(_poll_indexing_status)
+
+    await publish_collection_update(
+        ctx.collection_id,
+        {"action": "embedding_complete", "payload": {}},
+    )

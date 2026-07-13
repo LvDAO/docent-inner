@@ -17,6 +17,7 @@ import { login } from '../services/authService';
 import { useUserContext } from '../contexts/UserContext';
 import { useLocale } from '../contexts/LocaleContext';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { safeInternalRedirect } from '@/lib/safe-internal-redirect.mjs';
 
 function LoginPageContent() {
   const router = useRouter();
@@ -24,7 +25,7 @@ function LoginPageContent() {
   const { t } = useLocale();
   const searchParams = useSearchParams();
   const emailParam = searchParams.get('email') || '';
-  const redirectParam = searchParams.get('redirect') || '';
+  const redirectParam = safeInternalRedirect(searchParams.get('redirect'));
 
   // Form state
   const [email, setEmail] = useState(emailParam);
@@ -46,8 +47,7 @@ function LoginPageContent() {
       setUser(user);
 
       // Force a full page navigation to ensure cookie is processed
-      const redirectUrl = redirectParam || '/dashboard';
-      window.location.href = redirectUrl;
+      window.location.href = redirectParam || '/dashboard';
     } catch (error: unknown) {
       console.error('Failed to log in:', error);
 

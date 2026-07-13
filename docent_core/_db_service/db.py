@@ -22,10 +22,36 @@ logger = get_logger(__name__)
 @dataclass
 class PGParams:
     host: str
-    port: str
+    port: int
     user: str
     password: str
     database: str
+
+
+@dataclass(frozen=True)
+class PGPoolParams:
+    size: int
+    max_overflow: int
+
+
+def _get_env_int(name: str, default: int, minimum: int) -> int:
+    raw_value = ENV.get(name)
+    if raw_value is None or not raw_value.strip():
+        return default
+    try:
+        value = int(raw_value)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be an integer") from exc
+    if value < minimum:
+        raise ValueError(f"{name} must be at least {minimum}")
+    return value
+
+
+def get_pg_pool_params() -> PGPoolParams:
+    return PGPoolParams(
+        size=_get_env_int("DOCENT_PG_POOL_SIZE", default=5, minimum=1),
+        max_overflow=_get_env_int("DOCENT_PG_MAX_OVERFLOW", default=5, minimum=0),
+    )
 
 
 def get_pg_params() -> PGParams:
@@ -50,8 +76,19 @@ def get_pg_params() -> PGParams:
         pg_database = "docent"
         logger.info("No database name provided; using `docent` as default")
 
+    try:
+        parsed_port = int(pg_port)
+    except ValueError as exc:
+        raise ValueError("DOCENT_PG_PORT must be an integer") from exc
+    if not 1 <= parsed_port <= 65535:
+        raise ValueError("DOCENT_PG_PORT must be between 1 and 65535")
+
     return PGParams(
-        host=pg_host, port=pg_port, user=pg_user, password=pg_password, database=pg_database
+        host=pg_host,
+        port=parsed_port,
+        user=pg_user,
+        password=pg_password,
+        database=pg_database,
     )
 
 
@@ -65,7 +102,7 @@ def get_sync_engine():
             username=p.user,
             password=p.password,
             host=p.host,
-            port=int(p.port),
+            port=p.port,
             database=p.database,
         )
     )
@@ -99,6 +136,7 @@ class DocentDB:
                 return cls._instance
 
             p = get_pg_params()
+            pool = get_pg_pool_params()
 
             # Check that the target database is not 'postgres'
             if (target_database := p.database) == "postgres":
@@ -110,7 +148,7 @@ class DocentDB:
                 username=p.user,
                 password=p.password,
                 host=p.host,
-                port=int(p.port),
+                port=p.port,
                 database="postgres",  # Connect to default postgres database first
             )
 
@@ -124,8 +162,8 @@ class DocentDB:
             # Initialize engine with connection pooling
             engine = create_async_engine(
                 connection_url,
-                pool_size=25,
-                max_overflow=25,
+                pool_size=pool.size,
+                max_overflow=pool.max_overflow,
                 pool_timeout=30,
                 pool_recycle=1800,  # Recycle connections after 30 minutes
                 pool_pre_ping=True,  # Check connection validity before use
@@ -162,7 +200,8 @@ class DocentDB:
             # Check if the database exists
             async with temp_engine.connect() as conn:
                 result = await conn.execute(
-                    text(f"SELECT 1 FROM pg_database WHERE datname = '{database_name}'")
+                    text("SELECT 1 FROM pg_database WHERE datname = :database_name"),
+                    {"database_name": database_name},
                 )
                 exists = result.scalar() is not None
 
@@ -174,7 +213,10 @@ class DocentDB:
                 conn = await temp_engine.connect()
                 conn = await conn.execution_options(isolation_level="AUTOCOMMIT")
                 try:
-                    await conn.execute(text(f"CREATE DATABASE {database_name}"))
+                    quoted_database_name = temp_engine.dialect.identifier_preparer.quote(
+                        database_name
+                    )
+                    await conn.execute(text(f"CREATE DATABASE {quoted_database_name}"))
                     logger.info(f"Database '{database_name}' created successfully")
                 finally:
                     await conn.close()

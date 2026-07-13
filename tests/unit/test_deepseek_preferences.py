@@ -81,10 +81,7 @@ def test_deepseek_flash_pro_strength_mapping(monkeypatch: pytest.MonkeyPatch):
     clear_llm_env(monkeypatch)
     preferences = ProviderPreferences()
     assert preferences.summarize_agent_actions[0].model_name == DEEPSEEK_FLASH_MODEL
-    assert (
-        preferences.group_actions_into_high_level_steps[0].model_name
-        == DEEPSEEK_FLASH_MODEL
-    )
+    assert preferences.group_actions_into_high_level_steps[0].model_name == DEEPSEEK_FLASH_MODEL
     assert preferences.default_chat_models[0].model_name == DEEPSEEK_PRO_MODEL
     assert preferences.default_judge_models[0].model_name == DEEPSEEK_PRO_MODEL
     assert preferences.execute_search[0].model_name == DEEPSEEK_PRO_MODEL
@@ -100,9 +97,7 @@ def test_merge_models_with_byok_deduplicates_deepseek_models(monkeypatch: pytest
         api_keys={"deepseek": "test-key"},
     )
 
-    model_keys = [
-        (model.provider, model.model_name, model.reasoning_effort) for model in models
-    ]
+    model_keys = [(model.provider, model.model_name, model.reasoning_effort) for model in models]
     assert len(model_keys) == len(set(model_keys))
     assert {model.provider for model in models} == {"deepseek"}
     assert all(model.uses_byok for model in models)
@@ -153,6 +148,15 @@ def test_supported_model_api_key_providers_include_configured_provider(
     monkeypatch.setenv("DOCENT_LLM_PROVIDER", CUSTOM_PROVIDER)
 
     assert get_supported_model_api_key_providers() == [CUSTOM_PROVIDER, DEEPSEEK_PROVIDER]
+
+
+@pytest.mark.unit
+def test_unknown_configured_provider_fails_early(monkeypatch: pytest.MonkeyPatch):
+    clear_llm_env(monkeypatch)
+    monkeypatch.setenv("DOCENT_LLM_PROVIDER", "unknown-provider")
+
+    with pytest.raises(ValueError, match="Unsupported DOCENT_LLM_PROVIDER"):
+        get_configured_llm_provider()
 
 
 @pytest.mark.unit

@@ -7,7 +7,6 @@ from typing import Any
 
 import anyio
 from anyio.abc import TaskGroup
-from arq.connections import RedisSettings
 from arq.worker import run_worker
 
 from docent._log_util import get_logger
@@ -16,6 +15,7 @@ from docent_core._llm_util.localization import (
     get_job_response_locale,
     response_locale_context,
 )
+from docent_core._redis_config import get_redis_settings
 from docent_core._server._broker.redis_client import get_redis_client
 from docent_core._worker.constants import JOB_TIMEOUT_SECONDS, WORKER_QUEUE_NAME
 from docent_core._worker.job_worker_map import JOB_DISPATCHER_MAP
@@ -143,35 +143,10 @@ def run():
         init_sentry_or_raise(deployment_id, dsn)
         logger.info(f"Initialized Sentry for worker in {deployment_id}")
 
-    REDIS_HOST = ENV.get("DOCENT_REDIS_HOST")
-    REDIS_PORT = ENV.get("DOCENT_REDIS_PORT")
-    REDIS_USER = ENV.get("DOCENT_REDIS_USER")
-    REDIS_PASSWORD = ENV.get("DOCENT_REDIS_PASSWORD")
-    REDIS_TLS = ENV.get("DOCENT_REDIS_TLS", "false").strip().lower() == "true"
-
-    if REDIS_HOST is None or REDIS_PORT is None:
-        raise ValueError("DOCENT_REDIS_HOST and DOCENT_REDIS_PORT must be set")
-
-    # Build Redis settings with optional authentication and TLS
-    if REDIS_USER is not None and REDIS_PASSWORD is not None:
-        redis_settings = RedisSettings(
-            host=REDIS_HOST,
-            port=int(REDIS_PORT),
-            username=REDIS_USER,
-            password=REDIS_PASSWORD,
-            ssl=REDIS_TLS,
-        )
-    else:
-        redis_settings = RedisSettings(
-            host=REDIS_HOST,
-            port=int(REDIS_PORT),
-            ssl=REDIS_TLS,
-        )
-
     run_worker(
         {
             "functions": [run_job],
-            "redis_settings": redis_settings,
+            "redis_settings": get_redis_settings(),
             "queue_name": WORKER_QUEUE_NAME,
             "max_jobs": 1,  # per worker
             "job_timeout": get_worker_job_timeout_seconds(),
