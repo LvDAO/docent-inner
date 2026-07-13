@@ -5,6 +5,12 @@ from docent_core._worker.constants import JOB_TIMEOUT_SECONDS
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize("command", ["cancel", b"cancel"])
+def test_worker_decodes_cancel_command(command: str | bytes) -> None:
+    assert worker._decode_redis_command(command) == "cancel"
+
+
+@pytest.mark.unit
 def test_worker_job_timeout_defaults_to_thirty_minutes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

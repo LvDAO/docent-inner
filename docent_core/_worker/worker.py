@@ -3,7 +3,7 @@ Make sure to clean up any Redis streams and state keys after the job is finished
 """
 
 import traceback
-from typing import Any
+from typing import Any, cast
 
 import anyio
 from anyio.abc import TaskGroup
@@ -38,6 +38,10 @@ def get_worker_job_timeout_seconds() -> int:
     if timeout <= 0:
         raise ValueError("DOCENT_WORKER_JOB_TIMEOUT_SECONDS must be greater than zero")
     return timeout
+
+
+def _decode_redis_command(command: str | bytes) -> str:
+    return command.decode("utf-8") if isinstance(command, bytes) else command
 
 
 async def run_job(_: Any, ctx: ViewContext, job_id: str):
@@ -120,15 +124,15 @@ async def run_job(_: Any, ctx: ViewContext, job_id: str):
 
         while True:
             _queue, command = await REDIS.blpop(commands_queue)  # type: ignore
-            logger.info(f"{job_id} received {command}")
-            assert isinstance(command, str)
+            command = _decode_redis_command(cast(str | bytes, command))
+            logger.info("%s received %s", job_id, command)
 
             # Handle cancel command with optional response ID
             match command:
                 case "cancel":
                     tg.cancel_scope.cancel()
                 case _:
-                    logger.error(f"Unknown command received for job {job_id}: {str(command)}")  # type: ignore
+                    logger.error("Unknown command received for job %s: %s", job_id, command)
 
     async with anyio.create_task_group() as tg:
         tg.start_soon(_run, tg)
