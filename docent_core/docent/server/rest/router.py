@@ -83,6 +83,7 @@ from docent_core.docent.server.dependencies.user import (
     get_user_anonymous_ok,
 )
 from docent_core.docent.services.monoservice import MonoService
+from docent_core.localization import normalize_locale
 
 logger = get_logger(__name__)
 
@@ -1472,9 +1473,17 @@ async def _summarize_ordered_transcripts_actions(
     await send_update()
 
 
+def _resolve_requested_response_locale(
+    locale: SupportedLocale | None,
+    user: object | None,
+) -> SupportedLocale:
+    return normalize_locale(locale) if locale is not None else get_user_preferred_locale(user)
+
+
 @user_router.get("/{collection_id}/actions_summary")
 async def get_actions_summary(
     agent_run_id: str,
+    locale: SupportedLocale | None = None,
     mono_svc: MonoService = Depends(get_mono_svc),
     ctx: ViewContext = Depends(get_default_view_ctx),
     _: None = Depends(require_view_permission(Permission.READ)),
@@ -1484,7 +1493,7 @@ async def get_actions_summary(
         raise HTTPException(status_code=404, detail=f"AgentRun {agent_run_id} not found")
     if len(agent_run.transcripts) == 0:
         raise HTTPException(status_code=404, detail=f"AgentRun {agent_run_id} has no transcripts")
-    response_locale = get_user_preferred_locale(ctx.user)
+    response_locale = _resolve_requested_response_locale(locale, ctx.user)
 
     # Result variables; hashes prevent updating with identical content multiple times
     ordered_transcripts = _get_ordered_transcripts(agent_run)

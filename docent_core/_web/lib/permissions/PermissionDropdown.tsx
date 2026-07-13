@@ -10,6 +10,7 @@ import {
   useHasCollectionAdminPermission,
   useHasCollectionWritePermission,
 } from './hooks';
+import { useLocale } from '@/app/contexts/LocaleContext';
 
 // Permission Dropdown Component
 interface PermissionDropdownProps {
@@ -18,19 +19,20 @@ interface PermissionDropdownProps {
 }
 
 const PermissionDropdown = ({ value, onChange }: PermissionDropdownProps) => {
+  const { t } = useLocale();
   const hasWritePermission = useHasCollectionWritePermission();
   const hasAdminPermission = useHasCollectionAdminPermission();
   const permissionLabels = {
-    none: 'No access',
-    read: 'Can view',
-    write: 'Can edit',
-    admin: 'Full access',
+    none: t('permissions.noAccess'),
+    read: t('permissions.canView'),
+    write: t('permissions.canEdit'),
+    admin: t('permissions.fullAccess'),
   };
 
   const permissionDescriptions = {
-    read: 'View runs and searches',
-    write: 'Add/remove runs and perform searches',
-    admin: 'Manage sharing and delete the collection',
+    read: t('permissions.viewDescription'),
+    write: t('permissions.editDescription'),
+    admin: t('permissions.adminDescription'),
   };
 
   return (

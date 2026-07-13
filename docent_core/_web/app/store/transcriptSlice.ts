@@ -18,6 +18,7 @@ import {
   SolutionSummary,
 } from '../types/transcriptTypes';
 import { Citation } from '../types/experimentViewerTypes';
+import type { Locale } from '@/lib/i18n/locales';
 
 import { RootState } from './store';
 import { setToastNotification } from './toastSlice';
@@ -38,7 +39,9 @@ export interface TranscriptState {
   dashboardScrollToTranscriptIdx?: number;
   // Actions summary
   actionsSummary?: ActionsSummary;
+  actionsSummaryLocale?: Locale;
   loadingActionsSummaryForTranscriptId?: string;
+  loadingActionsSummaryLocale?: Locale;
   actionsSummaryTaskId?: string;
   // Solution summary
   solutionSummary?: SolutionSummary;
@@ -66,7 +69,10 @@ const initialState: TranscriptState = {
 
 export const getActionsSummary = createAsyncThunk(
   'transcript/getActionsSummary',
-  async (agentRunId: string, { dispatch, getState }) => {
+  async (
+    { agentRunId, locale }: { agentRunId: string; locale: Locale },
+    { dispatch, getState }
+  ) => {
     const state = getState() as RootState;
     const collectionId = state.collection.collectionId;
 
@@ -79,7 +85,9 @@ export const getActionsSummary = createAsyncThunk(
 
     // Set UI state
     dispatch(setActionsSummary(undefined));
+    dispatch(setActionsSummaryLocale(locale));
     dispatch(setLoadingActionsSummaryForTranscriptId(agentRunId));
+    dispatch(setLoadingActionsSummaryLocale(locale));
 
     if (!collectionId) {
       dispatch(
@@ -99,8 +107,12 @@ export const getActionsSummary = createAsyncThunk(
       dispatch(setActionsSummaryTaskId(taskId));
 
       // Create SSE connection using the service
+      const params = new URLSearchParams({
+        agent_run_id: agentRunId,
+        locale,
+      });
       const { onCancel } = sseService.createEventSource(
-        `/rest/${collectionId}/actions_summary?agent_run_id=${agentRunId}`,
+        `/rest/${collectionId}/actions_summary?${params.toString()}`,
         (data) => {
           // Update actions summary with streamed data
           dispatch(setActionsSummary(data as ActionsSummary));
@@ -200,7 +212,9 @@ export const clearActionsSummary = createAsyncThunk(
   'transcript/clearActionsSummary',
   async (_, { dispatch }) => {
     dispatch(setActionsSummary(undefined));
+    dispatch(setActionsSummaryLocale(undefined));
     dispatch(setLoadingActionsSummaryForTranscriptId(undefined));
+    dispatch(setLoadingActionsSummaryLocale(undefined));
   }
 );
 
@@ -285,11 +299,23 @@ export const transcriptSlice = createSlice({
     ) => {
       state.actionsSummary = action.payload;
     },
+    setActionsSummaryLocale: (
+      state,
+      action: PayloadAction<Locale | undefined>
+    ) => {
+      state.actionsSummaryLocale = action.payload;
+    },
     setLoadingActionsSummaryForTranscriptId: (
       state,
       action: PayloadAction<string | undefined>
     ) => {
       state.loadingActionsSummaryForTranscriptId = action.payload;
+    },
+    setLoadingActionsSummaryLocale: (
+      state,
+      action: PayloadAction<Locale | undefined>
+    ) => {
+      state.loadingActionsSummaryLocale = action.payload;
     },
     setActionsSummaryTaskId: (
       state,
@@ -299,6 +325,7 @@ export const transcriptSlice = createSlice({
     },
     onFinishLoadingActionsSummary: (state) => {
       state.loadingActionsSummaryForTranscriptId = undefined;
+      state.loadingActionsSummaryLocale = undefined;
       state.actionsSummaryTaskId = undefined;
     },
     setSolutionSummary: (
@@ -382,7 +409,9 @@ export const transcriptSlice = createSlice({
 export const {
   setCurAgentRun,
   setActionsSummary,
+  setActionsSummaryLocale,
   setLoadingActionsSummaryForTranscriptId,
+  setLoadingActionsSummaryLocale,
   setActionsSummaryTaskId,
   onFinishLoadingActionsSummary,
   setSolutionSummary,

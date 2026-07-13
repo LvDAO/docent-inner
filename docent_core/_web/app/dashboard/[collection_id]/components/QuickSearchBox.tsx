@@ -138,18 +138,18 @@ export default function QuickSearchBox({
   return (
     // <div className="bg-muted rounded-md space-y-1 border p-2">
     <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <div className="flex flex-col">
+      <div className="flex flex-col gap-2">
+        <div className="min-w-0">
           <div className="text-sm font-semibold">{t('chat.search.title')}</div>
           <div className="text-xs text-muted-foreground">
             {t('chat.search.description')}
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="text-[11px] text-muted-foreground">
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <div className="text-[11px] leading-snug text-muted-foreground">
             {t('chat.search.tryPreset')}
           </div>
-          <div className="flex flex-wrap gap-1">
+          <div className="flex min-w-0 flex-wrap gap-1">
             {presetQueries.map((preset) => {
               const IconComponent = preset.icon;
               return (
@@ -158,11 +158,13 @@ export default function QuickSearchBox({
                   onClick={() => handleSelectPreset(preset.query)}
                   onMouseEnter={() => handlePresetHover(preset.query)}
                   onMouseLeave={handlePresetLeave}
-                  className="inline-flex items-center gap-1.5 px-2 py-1 bg-background border border-border rounded-md text-xs font-medium text-primary disabled:opacity-50 hover:bg-secondary hover:border-border transition-colors"
+                  className="inline-flex min-w-0 items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-primary transition-colors hover:border-border hover:bg-secondary disabled:opacity-50"
                   disabled={!hasWritePermission}
                 >
-                  <IconComponent className={`h-3 w-3 ${preset.color}`} />
-                  {preset.label}
+                  <IconComponent
+                    className={`h-3 w-3 shrink-0 ${preset.color}`}
+                  />
+                  <span className="truncate">{preset.label}</span>
                 </button>
               );
             })}

@@ -114,7 +114,7 @@ export const workspaceZhCN = {
   'workspace.upload.runMetadata': '运行记录元数据',
   'workspace.upload.previousRun': '上一条运行记录',
   'workspace.upload.nextRun': '下一条运行记录',
-  'workspace.upload.runPosition': '第 {current} 条，共 {total} 条',
+  'workspace.upload.runPosition': '第 {current}/{total} 条',
   'workspace.upload.previewLimit': '预览仅包含前 {count} 条运行记录',
   'workspace.upload.importRuns': '导入运行记录（{count}）',
   'workspace.upload.importRunsPending': '导入运行记录',

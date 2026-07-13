@@ -4,6 +4,7 @@ from collections import Counter
 from datetime import UTC, datetime
 from typing import Any
 
+import anyio
 from sqlalchemy import select
 
 from docent._log_util import get_logger
@@ -139,7 +140,10 @@ async def hodoscope_analysis_job(ctx: ViewContext, job: SQLAJob) -> None:
                 "effective_run_limit": effective_run_limit,
             },
         )
-        summaries = await summarize_hodoscope_actions(actions)
+        summaries = await summarize_hodoscope_actions(
+            actions,
+            response_locale=config.locale,
+        )
 
         async def embedding_progress(progress: int) -> None:
             await _set_analysis_state(
@@ -190,6 +194,20 @@ async def hodoscope_analysis_job(ctx: ViewContext, job: SQLAJob) -> None:
             projection=projection,
             completed=True,
         )
+    except anyio.get_cancelled_exc_class():
+        # ARQ timeouts and explicit user cancellation both cancel this coroutine.
+        # Shield the state write so the analysis cannot remain permanently "running".
+        with anyio.CancelScope(shield=True):
+            await _set_analysis_state(
+                mono_svc,
+                analysis_id=analysis_id,
+                job=job,
+                stage="canceled",
+                progress=0,
+                status="canceled",
+                completed=True,
+            )
+        raise
     except Exception as exc:
         logger.error(f"Hodoscope analysis {analysis_id} failed: {exc}")
         await _set_analysis_state(

@@ -541,13 +541,19 @@ const AgentSummary: React.FC<AgentSummaryProps> = ({
   agentRunId,
 }) => {
   const dispatch = useAppDispatch();
-  const { t } = useLocale();
+  const { locale, t } = useLocale();
 
   const actionsSummary = useAppSelector(
     (state) => state.transcript?.actionsSummary
   );
   const loadingActionsSummaryForTranscriptId = useAppSelector(
     (state) => state.transcript?.loadingActionsSummaryForTranscriptId
+  );
+  const actionsSummaryLocale = useAppSelector(
+    (state) => state.transcript?.actionsSummaryLocale
+  );
+  const loadingActionsSummaryLocale = useAppSelector(
+    (state) => state.transcript?.loadingActionsSummaryLocale
   );
   const isLoadingActionsSummary =
     loadingActionsSummaryForTranscriptId === agentRunId;
@@ -676,15 +682,20 @@ const AgentSummary: React.FC<AgentSummaryProps> = ({
 
     // Request summary if we don't already have it loaded, and we're not loading it yet
     if (
-      loadingActionsSummaryForTranscriptId !== agentRunId &&
-      actionsSummary?.agent_run_id != agentRunId
+      (loadingActionsSummaryForTranscriptId !== agentRunId ||
+        loadingActionsSummaryLocale !== locale) &&
+      (actionsSummary?.agent_run_id != agentRunId ||
+        actionsSummaryLocale !== locale)
     ) {
-      dispatch(getActionsSummary(agentRunId));
+      dispatch(getActionsSummary({ agentRunId, locale }));
     }
   }, [
     agentRunId,
     loadingActionsSummaryForTranscriptId,
+    loadingActionsSummaryLocale,
     actionsSummary?.agent_run_id,
+    actionsSummaryLocale,
+    locale,
     dispatch,
   ]);
 

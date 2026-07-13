@@ -39,16 +39,16 @@ export default function SettingsSidebar() {
   ];
 
   return (
-    <div className="w-64 space-y-6">
+    <div className="w-full space-y-4 md:w-64 md:shrink-0 md:space-y-6">
       <div className="flex items-center space-x-4">
         <Button
           variant="ghost"
           size="sm"
           onClick={() => router.push('/dashboard')}
-          className="flex items-center space-x-2"
+          className="flex max-w-full items-center space-x-2"
         >
-          <ArrowLeft className="h-4 w-4" />
-          <span>{t('settings.backToDashboard')}</span>
+          <ArrowLeft className="h-4 w-4 shrink-0" />
+          <span className="truncate">{t('settings.backToDashboard')}</span>
         </Button>
       </div>
 
@@ -66,11 +66,11 @@ export default function SettingsSidebar() {
               <Button
                 key={item.id}
                 variant={isActive ? 'default' : 'ghost'}
-                className={'w-full justify-start'}
+                className="w-full min-w-0 justify-start"
                 onClick={() => router.push(item.href)}
               >
-                <Icon className="mr-2 h-4 w-4" />
-                {item.label}
+                <Icon className="mr-2 h-4 w-4 shrink-0" />
+                <span className="truncate">{item.label}</span>
               </Button>
             );
           })}

@@ -227,57 +227,55 @@ export function HodoscopePanel({
   return (
     <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm">
       <header className="border-b border-border/70 bg-muted/10 px-4 py-3">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-blue-border bg-blue-bg text-blue-text shadow-sm">
-                <Radar className="h-4 w-4" />
+        <div className="flex flex-col gap-3">
+          <div className="flex min-w-0 items-start gap-2.5">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-blue-border bg-blue-bg text-blue-text shadow-sm">
+              <Radar className="h-4 w-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <h2 className="shrink-0 text-sm font-semibold">
+                  {t('analysis.hodoscope.title')}
+                </h2>
+                {currentAnalysis ? (
+                  <Badge
+                    variant={
+                      currentAnalysis.status === 'error'
+                        ? 'destructive'
+                        : 'secondary'
+                    }
+                    className="h-5 shrink-0 whitespace-nowrap rounded-full px-2 text-[10px]"
+                  >
+                    {statusLabels[currentAnalysis.status] ??
+                      currentAnalysis.status}
+                  </Badge>
+                ) : null}
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-sm font-semibold">
-                    {t('analysis.hodoscope.title')}
-                  </h2>
-                  {currentAnalysis ? (
-                    <Badge
-                      variant={
-                        currentAnalysis.status === 'error'
-                          ? 'destructive'
-                          : 'secondary'
+              <p className="mt-0.5 break-words text-xs leading-relaxed text-muted-foreground">
+                {projection
+                  ? `${projection.projection_method.toUpperCase()} · ${t(
+                      'analysis.hodoscope.actionsAcrossGroups',
+                      {
+                        actions: projection.points.length,
+                        groups: projection.groups.length,
                       }
-                      className="h-5 rounded-full px-2 text-[10px]"
-                    >
-                      {statusLabels[currentAnalysis.status] ??
-                        currentAnalysis.status}
-                    </Badge>
-                  ) : null}
-                </div>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {projection
-                    ? `${projection.projection_method.toUpperCase()} · ${t(
-                        'analysis.hodoscope.actionsAcrossGroups',
-                        {
-                          actions: projection.points.length,
-                          groups: projection.groups.length,
-                        }
-                      )} · ${t('analysis.hodoscope.tagsCount', {
-                        count: projection.tag_catalog?.length ?? 0,
-                      })}`
-                    : currentAnalysis?.stage
-                      ? t('analysis.hodoscope.stagePoints', {
-                          stage:
-                            stageLabels[currentAnalysis.stage] ??
-                            currentAnalysis.stage,
-                          points: currentAnalysis.point_count,
-                        })
-                      : t('analysis.hodoscope.noMapData')}
-                </p>
-              </div>
+                    )} · ${t('analysis.hodoscope.tagsCount', {
+                      count: projection.tag_catalog?.length ?? 0,
+                    })}`
+                  : currentAnalysis?.stage
+                    ? t('analysis.hodoscope.stagePoints', {
+                        stage:
+                          stageLabels[currentAnalysis.stage] ??
+                          currentAnalysis.stage,
+                        points: currentAnalysis.point_count,
+                      })
+                    : t('analysis.hodoscope.noMapData')}
+              </p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-end gap-2">
-            <div className="w-48">
+            <div className="w-48 max-w-full shrink-0">
               <Label className="text-[11px] text-muted-foreground">
                 {t('analysis.hodoscope.groupBy')}
               </Label>
@@ -301,7 +299,7 @@ export function HodoscopePanel({
               </Select>
             </div>
 
-            <div className="w-48">
+            <div className="w-48 max-w-full shrink-0">
               <Label className="text-[11px] text-muted-foreground">
                 {t('analysis.hodoscope.tagBy')}
               </Label>
@@ -326,7 +324,7 @@ export function HodoscopePanel({
               </Select>
             </div>
 
-            <div className="w-24">
+            <div className="w-24 shrink-0">
               <Label
                 htmlFor="hodoscope-max-runs"
                 className="text-[11px] text-muted-foreground"
@@ -348,7 +346,7 @@ export function HodoscopePanel({
               />
             </div>
 
-            <div className="w-24">
+            <div className="w-24 shrink-0">
               <Label
                 htmlFor="hodoscope-max-points"
                 className="text-[11px] text-muted-foreground"
@@ -373,7 +371,7 @@ export function HodoscopePanel({
               />
             </div>
 
-            <div className="w-28">
+            <div className="w-28 shrink-0">
               <Label className="text-[11px] text-muted-foreground">
                 {t('analysis.hodoscope.projection')}
               </Label>
@@ -401,7 +399,7 @@ export function HodoscopePanel({
 
             {isActive ? (
               <Button
-                className="h-8"
+                className="h-8 shrink-0 whitespace-nowrap"
                 size="sm"
                 variant="outline"
                 disabled={!hasWritePermission || busy}
@@ -416,7 +414,7 @@ export function HodoscopePanel({
               </Button>
             ) : (
               <Button
-                className="h-8"
+                className="h-8 shrink-0 whitespace-nowrap"
                 size="sm"
                 disabled={!hasWritePermission || busy || !collectionId}
                 onClick={handleRun}
@@ -431,7 +429,7 @@ export function HodoscopePanel({
             )}
 
             <Button
-              className="h-8"
+              className="h-8 shrink-0 whitespace-nowrap"
               size="sm"
               variant="outline"
               aria-label={t('analysis.hodoscope.downloadJson')}

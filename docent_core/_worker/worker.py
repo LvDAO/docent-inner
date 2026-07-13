@@ -26,6 +26,20 @@ from docent_core.docent.services.monoservice import MonoService
 logger = get_logger(__name__)
 
 
+def get_worker_job_timeout_seconds() -> int:
+    raw_timeout = ENV.get("DOCENT_WORKER_JOB_TIMEOUT_SECONDS")
+    if raw_timeout is None or not raw_timeout.strip():
+        return JOB_TIMEOUT_SECONDS
+
+    try:
+        timeout = int(raw_timeout)
+    except ValueError as exc:
+        raise ValueError("DOCENT_WORKER_JOB_TIMEOUT_SECONDS must be an integer") from exc
+    if timeout <= 0:
+        raise ValueError("DOCENT_WORKER_JOB_TIMEOUT_SECONDS must be greater than zero")
+    return timeout
+
+
 async def run_job(_: Any, ctx: ViewContext, job_id: str):
     mono_svc = await MonoService.init()
     canceled = False
@@ -160,6 +174,6 @@ def run():
             "redis_settings": redis_settings,
             "queue_name": WORKER_QUEUE_NAME,
             "max_jobs": 1,  # per worker
-            "job_timeout": JOB_TIMEOUT_SECONDS,
+            "job_timeout": get_worker_job_timeout_seconds(),
         }
     )

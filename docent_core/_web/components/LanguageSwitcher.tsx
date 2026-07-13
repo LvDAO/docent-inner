@@ -11,6 +11,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
+import { rubricApi } from '@/app/api/rubricApi';
+import { useAppDispatch } from '@/app/store/hooks';
 import { cn } from '@/lib/utils';
 import { type Locale } from '@/lib/i18n/locales';
 import { useLocale } from '@/app/contexts/LocaleContext';
@@ -24,11 +26,23 @@ export function LanguageSwitcher({
   className,
   mode = 'select',
 }: LanguageSwitcherProps) {
+  const dispatch = useAppDispatch();
   const { locale, setLocale, t } = useLocale();
+  const currentLanguage =
+    locale === 'en' ? t('language.english') : t('language.chineseSimplified');
 
   const changeLocale = async (nextLocale: Locale) => {
     try {
       await setLocale(nextLocale);
+      dispatch(
+        rubricApi.util.invalidateTags([
+          'RubricJob',
+          'JudgeResult',
+          'ClusteringJob',
+          'Centroids',
+          'Assignments',
+        ])
+      );
     } catch {
       toast({
         title: t('common.error'),
@@ -63,7 +77,7 @@ export function LanguageSwitcher({
         className={cn('h-7 w-36 text-xs', className)}
       >
         <Languages className="mr-1 h-3.5 w-3.5" />
-        <SelectValue placeholder={t('language.select')} />
+        <SelectValue>{currentLanguage}</SelectValue>
       </SelectTrigger>
       <SelectContent>
         <SelectItem value="en">{t('language.english')}</SelectItem>

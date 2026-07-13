@@ -26,6 +26,7 @@ import {
 import { PermissionLevel } from './types';
 import PermissionDropdown from './PermissionDropdown';
 import { toast } from '@/hooks/use-toast';
+import { useLocale } from '@/app/contexts/LocaleContext';
 import { useRequireUserContext } from '@/app/contexts/UserContext';
 import {
   useHasCollectionAdminPermission,
@@ -34,6 +35,7 @@ import {
 
 const AddCollaborator = ({ collectionId }: { collectionId: string }) => {
   const { user } = useRequireUserContext();
+  const { t } = useLocale();
 
   // Local state for input
   const [emailInput, setEmailInput] = useState('');
@@ -55,8 +57,8 @@ const AddCollaborator = ({ collectionId }: { collectionId: string }) => {
 
       if (result.error) {
         toast({
-          title: 'Error',
-          description: 'Failed to look up user. Please try again.',
+          title: t('common.error'),
+          description: t('permissions.lookupFailed'),
           variant: 'destructive',
         });
         return;
@@ -65,16 +67,18 @@ const AddCollaborator = ({ collectionId }: { collectionId: string }) => {
       const newUser = result.data;
       if (!newUser) {
         toast({
-          title: 'User not found',
-          description: `No user found with email address: ${emailInput.trim()}`,
+          title: t('permissions.userNotFound'),
+          description: t('permissions.userNotFoundDescription', {
+            email: emailInput.trim(),
+          }),
           variant: 'destructive',
         });
         return;
       }
       if (newUser.id === user.id) {
         toast({
-          title: 'Error',
-          description: 'You cannot invite yourself.',
+          title: t('common.error'),
+          description: t('permissions.cannotInviteSelf'),
           variant: 'destructive',
         });
         return;
@@ -89,10 +93,10 @@ const AddCollaborator = ({ collectionId }: { collectionId: string }) => {
       }).unwrap();
 
       setEmailInput('');
-    } catch (error) {
+    } catch {
       toast({
-        title: 'Error',
-        description: 'Failed to invite user. Please try again.',
+        title: t('common.error'),
+        description: t('permissions.inviteFailed'),
         variant: 'destructive',
       });
     }
@@ -100,23 +104,23 @@ const AddCollaborator = ({ collectionId }: { collectionId: string }) => {
   if (!hasWritePermission) {
     return (
       <div className="text-sm text-muted-foreground">
-        You do not have permission to add or edit collaborators.
+        {t('permissions.noManagePermission')}
       </div>
     );
   }
 
   return (
-    <div className="flex gap-2 items-center">
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
       <Input
         value={emailInput}
         onChange={(e) => setEmailInput(e.target.value)}
         disabled={!hasWritePermission}
         placeholder={
           hasWritePermission
-            ? 'Enter email address'
-            : "You don't have permission to add collaborators"
+            ? t('permissions.emailPlaceholder')
+            : t('permissions.noAddPermission')
         }
-        className="h-7 text-xs"
+        className="h-7 min-w-0 flex-1 text-xs"
       />
       <PermissionDropdown
         value={inviteePermissionLevel}
@@ -129,13 +133,14 @@ const AddCollaborator = ({ collectionId }: { collectionId: string }) => {
         className="h-7"
       >
         <UserPlus size={16} className="mr-1" />
-        Invite
+        {t('permissions.invite')}
       </Button>
     </div>
   );
 };
 
 const ShareViewPopover = ({ collectionId }: { collectionId: string }) => {
+  const { t } = useLocale();
   // Get current public permission level from collaborators
   const { publicPermissionLevel } = useGetCollaboratorsQuery(collectionId, {
     selectFromResult: (result) => {
@@ -176,7 +181,9 @@ const ShareViewPopover = ({ collectionId }: { collectionId: string }) => {
 
   const hasAdminPermission = useHasCollectionAdminPermission();
   const hasWritePermission = useHasCollectionWritePermission();
-  const accessButtonLabel = hasWritePermission ? 'Read-write' : 'Read-only';
+  const accessButtonLabel = hasWritePermission
+    ? t('permissions.readWrite')
+    : t('collections.readOnly');
 
   if (!hasAdminPermission) {
     return (
@@ -190,25 +197,27 @@ const ShareViewPopover = ({ collectionId }: { collectionId: string }) => {
     <Popover>
       <PopoverTrigger asChild>
         <Button variant="outline" size="sm" className="gap-x-2 h-7 px-2">
-          <Share2 size={14} /> Share
+          <Share2 size={14} /> {t('permissions.share')}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="_SharePopover w-[640px] p-3 space-y-3 rounded-lg">
+      <PopoverContent className="_SharePopover w-[calc(100vw-2rem)] max-w-[640px] space-y-3 rounded-lg p-3">
         {/* Section 1: Add collaborators */}
         <div className="space-y-1">
-          <h3 className="text-sm font-medium">Add collaborators</h3>
+          <h3 className="text-sm font-medium">
+            {t('permissions.addCollaborators')}
+          </h3>
           <AddCollaborator collectionId={collectionId} />
         </div>
 
         {/* Section 2: Access settings */}
         <div className="border-t" />
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <Label htmlFor="public-access" className="text-sm font-medium">
-              Public access
+              {t('permissions.publicAccess')}
             </Label>
             <p className="text-xs text-muted-foreground">
-              Anyone with the link can access
+              {t('permissions.publicAccessDescription')}
             </p>
           </div>
           <PublicPermissionDropdown
@@ -238,16 +247,17 @@ const PublicPermissionDropdown = ({
   onChange,
   disabled = false,
 }: PublicPermissionDropdownProps) => {
+  const { t } = useLocale();
   const publicPermissionLabels = {
-    none: 'No access',
-    read: 'Can view',
-    write: 'Can edit',
+    none: t('permissions.noAccess'),
+    read: t('permissions.canView'),
+    write: t('permissions.canEdit'),
   };
 
   const publicPermissionDescriptions = {
-    none: 'Only invited people can access',
-    read: 'Anyone with the link can view',
-    write: 'Anyone with the link can edit',
+    none: t('permissions.publicNoneDescription'),
+    read: t('permissions.publicViewDescription'),
+    write: t('permissions.publicEditDescription'),
   };
 
   return (
@@ -256,7 +266,7 @@ const PublicPermissionDropdown = ({
       onValueChange={(val) => onChange(val as PermissionLevel)}
       disabled={disabled}
     >
-      <SelectTrigger className="w-28 h-7 text-xs">
+      <SelectTrigger id="public-access" className="w-28 h-7 text-xs">
         <SelectValue className="text-xs font-medium">
           {publicPermissionLabels[
             value as keyof typeof publicPermissionLabels
