@@ -21,7 +21,8 @@ class AnalyticsClient:
                 self.ph = None
                 return
 
-        self.ph = Posthog(project_api_key=api_key, host="https://us.i.posthog.com")
+        host = ENV.get("POSTHOG_API_HOST") or "https://us.i.posthog.com"
+        self.ph = Posthog(project_api_key=api_key, host=host)
         if not deployment_id:
             deployment_id = "local"
         logger.info(f"PostHog client initialized for {deployment_id}")

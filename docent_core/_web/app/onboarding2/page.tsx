@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { safeInternalRedirect } from '@/lib/safe-internal-redirect.mjs';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -235,7 +236,7 @@ const DISCOVERY_OPTIONS: QuestionOption[] = [
 export default function Onboarding2Page() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectParam = searchParams.get('redirect') || '';
+  const redirectParam = safeInternalRedirect(searchParams.get('redirect'));
   const [currentStep, setCurrentStep] = useState(1);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const otherInputRef = useRef<HTMLInputElement>(null);
@@ -329,8 +330,7 @@ export default function Onboarding2Page() {
         title: 'Welcome to Docent!',
         description: 'Your account has been set up successfully.',
       });
-      const redirectUrl = redirectParam || '/dashboard';
-      router.push(redirectUrl);
+      router.push(redirectParam || '/dashboard');
     } catch (error) {
       console.error('Failed to complete onboarding:', error);
       toast({

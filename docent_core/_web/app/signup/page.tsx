@@ -21,13 +21,14 @@ import { signup } from '../services/authService';
 import { useUserContext } from '../contexts/UserContext';
 import { useLocale } from '../contexts/LocaleContext';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { safeInternalRedirect } from '@/lib/safe-internal-redirect.mjs';
 
 function SignupPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { setUser } = useUserContext();
   const { locale, t } = useLocale();
-  const redirectParam = searchParams.get('redirect') || '';
+  const redirectParam = safeInternalRedirect(searchParams.get('redirect'));
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -105,8 +106,7 @@ function SignupPageContent() {
       setUser(user);
 
       // Force a full page navigation to ensure cookie is processed
-      const redirectUrl = redirectParam || '/onboarding';
-      window.location.href = redirectUrl;
+      window.location.href = redirectParam || '/onboarding';
     } catch (error: unknown) {
       console.error('Failed to sign up:', error);
 

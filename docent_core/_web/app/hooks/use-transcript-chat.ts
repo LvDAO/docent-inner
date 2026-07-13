@@ -32,12 +32,12 @@ export function useTranscriptChat({
   const [jobId, setJobId] = useState<string | null>(null);
 
   // Get current chat state when session is available (for initial load)
-  const { data: chatState } = useGetChatStateQuery(
+  const { currentData: chatState } = useGetChatStateQuery(
     sessionId ? { collectionId, runId, sessionId } : skipToken
   );
 
   // Check if there is an active job for this session (to resume SSE after refresh)
-  const { data: activeJobData } = useGetActiveChatJobQuery(
+  const { currentData: activeJobData } = useGetActiveChatJobQuery(
     sessionId ? { collectionId, runId, sessionId } : skipToken
   );
   useEffect(() => {
@@ -47,8 +47,8 @@ export function useTranscriptChat({
   // When the chat session changes (e.g., switching judge results),
   // clear any prior jobId so we don't keep streaming old SSE messages.
   useEffect(() => {
-    // Reset job tracking on session change to avoid stale sseMessages
     setJobId(null);
+    setPersistedMessages(undefined);
   }, [sessionId]);
 
   const [getOrCreateChatSession] = useGetOrCreateChatSessionMutation();
@@ -81,6 +81,11 @@ export function useTranscriptChat({
   useEffect(() => {
     if (!collectionId || !runId) return;
 
+    let cancelled = false;
+    setSessionId(null);
+    setJobId(null);
+    setPersistedMessages(undefined);
+
     getOrCreateChatSession({
       collectionId,
       runId,
@@ -88,14 +93,20 @@ export function useTranscriptChat({
     })
       .unwrap()
       .then((res) => {
-        setSessionId(res.session_id);
+        if (!cancelled) setSessionId(res.session_id);
       })
       .catch((error) => {
-        console.error(
-          'Failed to create or get transcript chat session:',
-          error
-        );
+        if (!cancelled) {
+          console.error(
+            'Failed to create or get transcript chat session:',
+            error
+          );
+        }
       });
+
+    return () => {
+      cancelled = true;
+    };
   }, [collectionId, runId, judgeResult?.id, getOrCreateChatSession]);
 
   useEffect(() => {

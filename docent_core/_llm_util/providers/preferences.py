@@ -83,6 +83,14 @@ def _env_reasoning_effort(
 def get_configured_llm_provider() -> str:
     provider = _env_value("DOCENT_LLM_PROVIDER", DEEPSEEK_PROVIDER)
     assert provider is not None
+    # Import lazily to keep provider modules independent from preferences.
+    from docent_core._llm_util.providers.registry import PROVIDERS
+
+    if provider not in PROVIDERS:
+        supported = ", ".join(sorted(PROVIDERS))
+        raise ValueError(
+            f"Unsupported DOCENT_LLM_PROVIDER={provider!r}. Supported providers: {supported}."
+        )
     return provider
 
 

@@ -9,9 +9,9 @@ from docent._log_util import get_logger
 logger = get_logger(__name__)
 
 
-def load_dotenv() -> MutableMapping[str, str]:
-    # Navigate to project root (3 levels up) by default
-    fpath = Path(__file__).parent.parent.parent.absolute() / ".env"
+def load_dotenv(env_path: Path | None = None) -> MutableMapping[str, str]:
+    # Navigate to project root (3 levels up) by default.
+    fpath = env_path or Path(__file__).parent.parent.parent.absolute() / ".env"
     # Determine how to resolve conflicts between .env and os.environ
     env_resolution_strategy = os.getenv("ENV_RESOLUTION_STRATEGY", "exception")
     if env_resolution_strategy not in ["exception", "dotenv", "os_environ"]:
@@ -37,18 +37,21 @@ def load_dotenv() -> MutableMapping[str, str]:
         elif k in os.environ and os.environ[k] != v:
             if env_resolution_strategy == "exception":
                 raise ValueError(
-                    f"Conflict found for {k}: {v} in .env and {os.environ[k]} in environment"
+                    f"Conflict found for {k} between .env and the process environment. "
+                    "Set ENV_RESOLUTION_STRATEGY to choose which source wins."
                 )
             elif env_resolution_strategy == "dotenv":
                 logger.warning(
-                    f"Found conflict for {k}: {v} in .env and {os.environ[k]} in environment. "
-                    f"Using .env value: {v}"
+                    "Found conflict for %s between .env and the process environment; "
+                    "using the .env value.",
+                    k,
                 )
                 os.environ[k] = v
             elif env_resolution_strategy == "os_environ":
                 logger.warning(
-                    f"Found conflict for {k}: {v} in .env and {os.environ[k]} in environment. "
-                    f"Using environment value: {os.environ[k]}"
+                    "Found conflict for %s between .env and the process environment; "
+                    "using the process value.",
+                    k,
                 )
         else:
             os.environ[k] = v

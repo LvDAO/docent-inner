@@ -24,6 +24,9 @@
     --input: 0 0% 89.8%;
     --ring: 0 0% 3.9%;
     --radius: 0.5rem;
+    --font-open-sans: 'Segoe UI', Arial, sans-serif;
+    --font-jetbrains-mono:
+      'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
 
     /* General semantic colors */
     --blue: 213.8 100% 96.9%;

@@ -2,15 +2,24 @@
 
 For most users, we recommend starting with the [public version](../quickstart.md) of Docent. We also provide white-glove hosting support for larger organizations; please [reach out](mailto:kevin@transluce.org?subject=Inquiry%20about%20Docent%20hosting) if you're interested.
 
-### 1. Clone the repo and configure `.env`
+### 1. Clone the repo
 
 ```bash
 git clone https://github.com/TransluceAI/docent.git
 cd docent
-cp .env.template .env
 ```
 
-You should now have a `.env` file at the project root. See [here for details on how to fill it in](./environment_variables.md).
+Install [Docker Engine](https://docs.docker.com/engine/install/) with Docker Compose v2. No host Python, uv, Bun, Postgres, or Redis installation is required for the Compose path.
+
+### 2. Create and edit the single configuration file
+
+Run the deployment command once:
+
+```bash
+./deploy.sh
+```
+
+The first run copies `.env.template` to `.env`, restricts its permissions, and stops. Edit only `.env`; do not edit the Compose files for normal deployment settings. Replace every `<...>` placeholder and review the values described in [Environment variables](./environment_variables.md).
 
 For LLM-backed analysis, set the LLM endpoint in `.env`. The default is DeepSeek:
 
@@ -25,145 +34,61 @@ DOCENT_LLM_PRO_MODEL=deepseek-v4-pro
 For a custom OpenAI-compatible endpoint, set `DOCENT_LLM_PROVIDER=custom`, provide your `DOCENT_LLM_BASE_URL`, and set the model variables you want each Docent feature to use. See [LLM calls](./environment_variables.md#llm-calls) for the per-feature model list.
 
 !!! note
-    The Web UI and `/rest` API use one origin by default. Configure `DOCENT_CORS_ORIGINS` only if you explicitly run the Web CLI with `--cross-origin` or put the API on a separate public origin.
+The Web UI and `/rest` API use one origin by default. Configure `DOCENT_CORS_ORIGINS` only if you explicitly run the Web CLI with `--cross-origin` or put the API on a separate public origin.
 
-### 2. Start the backend server and frontend UI
+!!! note
+In Compose, `localhost` inside backend or worker settings means that container. For an LLM or embedding server running on the Docker host, use `http://host.docker.internal:PORT/v1`. Linux host-gateway routing is included by default. Another Compose service should be addressed by its service name.
 
-Docker Compose is the easiest way to get started, but you may want a manual installation to support faster development loops (e.g., for hot reloading).
+### 3. Deploy with one command
 
-=== "Docker Compose (recommended)"
+Run the same command after saving `.env`:
 
-    First ensure [Docker Engine](https://docs.docker.com/engine/install/) and [Docker Compose](https://docs.docker.com/compose/install/) are installed. Then run:
+```bash
+./deploy.sh
+```
 
-    === "As non-root"
-        ```bash
-        DOCENT_SERVER_PORT=8889 DOCENT_WEB_PORT=3001 docker compose up --build
-        ```
+This command validates `.env` placeholders and the rendered Compose model, builds both application images, waits for Postgres and Redis, applies `alembic upgrade head`, starts the API and worker, and waits for the Web health check. It always rebuilds the frontend, so the internal API proxy cannot retain an old `.env` target.
 
-    === "As root"
-        ```bash
-        sudo env DOCENT_SERVER_PORT=8889 DOCENT_WEB_PORT=3001 docker compose up --build
-        ```
+Open `http://localhost:3000` by default, or use the `DOCENT_WEB_PORT` configured in `.env`. Only the Web bind address is remotely exposed; the bundled Postgres and Redis ports default to `127.0.0.1`.
 
-    `DOCENT_SERVER_PORT` is internal to the Compose network. `DOCENT_WEB_PORT` is the single application port published on the host.
+Useful operations:
 
-    Cold build + start should take a few minutes. Once finished, you can run
+```bash
+docker compose ps
+docker compose logs -f backend worker frontend
+docker compose down
+```
 
-    === "As non-root"
-        ```bash
-        docker ps
-        ```
+`docker compose down` preserves the named Postgres volume. Do not add `--volumes` unless you intend to delete all stored Docent data.
 
-    === "As root"
-        ```bash
-        sudo docker ps
-        ```
+### Manual development
 
-    to check that the five services are running. The application port layout should look like this:
-    ```bash
-    NAME               PORTS
-    docent_backend     8889/tcp
-    docent_frontend    0.0.0.0:3001->3000/tcp, [::]:3001->3000/tcp
-    docent_postgres    0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp
-    docent_redis       0.0.0.0:6379->6379/tcp, [::]:6379->6379/tcp
-    docent_worker
-    ```
+Use the following path for hot reloading and source development. It is not the recommended new-machine deployment path.
 
-    Open `http://localhost:3001`. For a remote host or SSH tunnel, expose or forward only `DOCENT_WEB_PORT`; browser API, uploads, authentication, and streaming requests use the same port under `/rest`.
+If you don't already have Postgres and Redis installed, start the loopback-bound development data services:
 
-    To shut Docent down, either press `Ctrl+C` in the terminal or run:
+```bash
+docker compose -f docker-compose-db.yml up -d
+```
 
-    === "As non-root"
-        ```bash
-        docker compose down
-        ```
+Then install the application:
 
-    === "As root"
-        ```bash
-        sudo docker compose down
-        ```
+```bash
+uv sync --extra dev
+uv run alembic upgrade head
+```
 
-    !!! note
-        If you make changes to the codebase, you'll need to stop the containers, then rebuild by **keeping the `--build` argument**. If `--build` is omitted, your changes will not be reflected.
+Run the three application processes in separate terminals:
 
-=== "Manual"
+```bash
+uv run docent_core server --port 8889 --reload
+uv run docent_core worker --workers 1
+uv run docent_core web --port 3001 --backend-url http://localhost:8889
+```
 
-    If you don't already have Postgres and Redis installed, you can start them with Docker:
+The `--backend-url` value is private to the Next.js proxy; the browser uses `http://localhost:3001/rest/...` through the same Web origin.
 
-    === "As non-root"
-        ```bash
-        docker compose -f docker-compose-db.yml up --build
-        ```
-
-    === "As root"
-        ```bash
-        sudo docker compose -f docker-compose-db.yml up --build
-        ```
-
-    after which Postgres and Redis will be available at the addresses set in [`.env`](./environment_variables.md). To set up your own databases, visit the official docs for [Postgres](https://www.postgresql.org/download/) and [Redis](https://redis.io/docs/latest/operate/oss_and_stack/install/archive/install-redis/).
-
-    Then run:
-
-    === "uv"
-        ```bash
-        uv sync --extra dev
-        ```
-
-    === "pip"
-        ```bash
-        pip install -e .[dev]
-        ```
-
-    to install the core library, and
-
-    ```bash
-    pre-commit install
-    ```
-
-    to set up pre-commit hooks for development.
-
-    Before running the application, you need to set up your database with Alembic migrations. First create a PostgreSQL database that matches the name in your `.env` file. Then run
-
-    ```bash
-    alembic upgrade head
-    ```
-
-    to create all database tables. Now run
-
-    === "Prod"
-        ```bash
-        docent_core server --port 8889 --workers 4
-        ```
-
-    === "Dev (with autoreload)"
-        ```bash
-        docent_core server --port 8889 --reload
-        ```
-
-    to start the API server,
-
-    === "Prod"
-        ```bash
-        docent_core worker --workers 4
-        ```
-
-    to start the worker, which handles background work, and
-
-    === "Prod"
-        ```bash
-        docent_core web --build --port 3001 --backend-url http://localhost:8889
-        ```
-
-    === "Dev (with autoreload)"
-        ```bash
-        docent_core web --port 3001 --backend-url http://localhost:8889
-        ```
-
-    to start the frontend. The `--backend-url` value is the private proxy target; the browser still uses `http://localhost:3001/rest/...`. You may need to [install Bun](https://bun.com/docs/installation) first.
-
-Finally, try accessing the Docent UI at `http://localhost:3001`.
-
-### 3. Customize the Docent client
+### 4. Customize the Docent client
 
 When creating `Docent` client objects, you'll need to specify custom server and frontend URLs:
 
@@ -171,7 +96,7 @@ When creating `Docent` client objects, you'll need to specify custom server and 
 import os
 from docent import Docent
 
-docent_url = "http://localhost:3001"
+docent_url = "http://localhost:3000"
 client = Docent(
     server_url=docent_url,
     web_url=docent_url,

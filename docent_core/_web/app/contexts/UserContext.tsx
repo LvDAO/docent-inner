@@ -1,6 +1,12 @@
 'use client';
 
-import { createContext, useContext, useState, ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+} from 'react';
 import type { User } from '../types/userTypes';
 import posthog from 'posthog-js';
 
@@ -22,10 +28,9 @@ export const UserProvider = ({
 }: UserProviderProps) => {
   const [user, setUser] = useState<User | null>(initialUser);
 
-  if (user) {
-    console.log('Identified user:', user);
-    posthog.identify(user.id);
-  }
+  useEffect(() => {
+    if (user) posthog.identify(user.id);
+  }, [user]);
 
   return (
     <UserContext.Provider value={{ user, setUser }}>

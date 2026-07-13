@@ -36,6 +36,7 @@ const createEventSource = (
 
   // Store the EventSource reference for cleanup
   eventSourcesMap[taskId] = eventSource;
+  let closed = false;
 
   // Define the message handler
   eventSource.onmessage = (event) => {
@@ -74,6 +75,8 @@ const createEventSource = (
 
   // Function to close the connection and clean up
   const closeConnection = () => {
+    if (closed) return;
+    closed = true;
     if (eventSourcesMap[taskId]) {
       eventSource.close();
       delete eventSourcesMap[taskId];
@@ -103,10 +106,11 @@ function postEventStream(
 
   const controller = new AbortController();
 
-  let cancelled = false;
+  let closed = false;
 
   const closeConnection = () => {
-    cancelled = true;
+    if (closed) return;
+    closed = true;
     controller.abort();
     delete eventSourcesMap[taskId];
     onFinish();
@@ -170,7 +174,7 @@ function postEventStream(
         }
       }
     } catch (error) {
-      if (!cancelled) {
+      if (!closed) {
         console.error('POST event stream error:', error);
         dispatch(
           setToastNotification({

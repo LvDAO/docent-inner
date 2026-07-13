@@ -2,44 +2,57 @@
 title: Environment variables
 ---
 
+## Deployment
+
+Normal Docker deployments use only the project-root `.env` file. `./deploy.sh` creates it from `.env.template`, validates placeholders and Compose isolation, then rebuilds and starts the stack.
+
+- `COMPOSE_PROJECT_NAME`: Unique name used to isolate containers, networks, and volumes on a shared machine.
+- `DOCENT_WEB_BIND_ADDRESS`: Host address for the single public Web/API entrypoint. Default: `0.0.0.0`.
+- `DOCENT_WEB_PORT`: Published Web/API port. Default: `3000`.
+- `DOCENT_SERVER_PORT`: Internal API port in the Compose network. Default: `8888`.
+- `DOCENT_DATA_BIND_ADDRESS`: Host binding for bundled Postgres and Redis. Default: `127.0.0.1`.
+- `DOCENT_BACKEND_WORKERS`: API process count. Default: `2`.
+- `DOCENT_WORKER_PROCESSES`: Background-job process count. Default: `1`.
+
 ## LLM calls
 
 Docent defaults to DeepSeek. Self-hosted deployments can change the default endpoint and model routing through `.env` without editing Python code.
 
-* `DOCENT_LLM_PROVIDER`: LLM provider to use for Docent analysis calls.
-    * Default: `deepseek`
-    * Use `deepseek` for DeepSeek-compatible calls with DeepSeek reasoning/thinking parameters.
-    * Use `custom` for a generic OpenAI-compatible chat-completions endpoint.
-* `DOCENT_LLM_BASE_URL`: Base URL for the configured provider.
-    * Default: `https://api.deepseek.com`
-    * Example custom value: `https://your-provider.example/v1`
-* `DOCENT_LLM_API_KEY`: API key for the configured provider.
-    * Takes precedence over `DEEPSEEK_API_KEY`.
-* `DEEPSEEK_API_KEY`: Backward-compatible DeepSeek key alias.
-* `DOCENT_LLM_FLASH_MODEL`: Default fast/cheap model.
-    * Default: `deepseek-v4-flash`
-* `DOCENT_LLM_PRO_MODEL`: Default stronger model.
-    * Default: `deepseek-v4-pro`
-* `DOCENT_LLM_CONTEXT_WINDOW`: Context window shown to the UI for models not recognized by Docent.
-    * Default: `1000000`
-* `LLM_CACHE_PATH`: Path to the LLM cache
+- `DOCENT_LLM_PROVIDER`: LLM provider to use for Docent analysis calls.
+  - Default: `deepseek`
+  - Use `deepseek` for DeepSeek-compatible calls with DeepSeek reasoning/thinking parameters.
+  - Use `custom` for a generic OpenAI-compatible chat-completions endpoint.
+- `DOCENT_LLM_BASE_URL`: Base URL for the configured provider.
+  - Default: `https://api.deepseek.com`
+  - Example custom value: `https://your-provider.example/v1`
+- `DOCENT_LLM_API_KEY`: API key for the configured provider.
+  - Takes precedence over `DEEPSEEK_API_KEY`.
+- `DEEPSEEK_API_KEY`: Backward-compatible DeepSeek key alias.
+- `DOCENT_LLM_FLASH_MODEL`: Default fast/cheap model.
+  - Default: `deepseek-v4-flash`
+- `DOCENT_LLM_PRO_MODEL`: Default stronger model.
+  - Default: `deepseek-v4-pro`
+- `DOCENT_LLM_CONTEXT_WINDOW`: Context window shown to the UI for models not recognized by Docent.
+  - Default: `1000000`
+- `LLM_CACHE_PATH`: Path to the LLM cache
 
 Optional per-feature model overrides:
 
-* `DOCENT_LLM_CHAT_MODEL`: Transcript chat model.
-* `DOCENT_LLM_JUDGE_MODEL`: Primary rubric judge model.
-* `DOCENT_LLM_JUDGE_FALLBACK_MODEL`: Secondary rubric judge model.
-* `DOCENT_LLM_SUMMARIZE_AGENT_ACTIONS_MODEL`: Low-level action summary model.
-* `DOCENT_LLM_GROUP_ACTIONS_MODEL`: High-level action grouping model.
-* `DOCENT_LLM_OBSERVATIONS_MODEL`: Interesting observations model.
-* `DOCENT_LLM_SEARCH_MODEL`: Search/query execution model.
-* `DOCENT_LLM_REFINE_MODEL`: Agent refinement model.
-* `DOCENT_LLM_REFINEMENT_MESSAGE_MODEL`: Interactive refinement chat model.
-* `DOCENT_LLM_CLUSTER_MODEL`: Cluster proposal/synthesis model.
-* `DOCENT_LLM_CLUSTER_ASSIGN_MODEL`: Fast cluster assignment model.
-* `DOCENT_LLM_CLUSTER_ASSIGN_STRONG_MODEL`: Strong cluster assignment model.
-* `DOCENT_LLM_GENERATE_QUERIES_MODEL`: Query generation model.
-* `DOCENT_LLM_SUMMARIZE_INTENDED_SOLUTION_MODEL`: Intended-solution summary model.
+- `DOCENT_LLM_CHAT_MODEL`: Transcript chat model.
+- `DOCENT_LLM_JUDGE_MODEL`: Primary rubric judge model.
+- `DOCENT_LLM_JUDGE_FALLBACK_MODEL`: Secondary rubric judge model.
+- `DOCENT_LLM_SUMMARIZE_AGENT_ACTIONS_MODEL`: Low-level action summary model.
+- `DOCENT_LLM_HODOSCOPE_ACTION_SUMMARY_MODEL`: Hodoscope action summary model.
+- `DOCENT_LLM_GROUP_ACTIONS_MODEL`: High-level action grouping model.
+- `DOCENT_LLM_OBSERVATIONS_MODEL`: Interesting observations model.
+- `DOCENT_LLM_SEARCH_MODEL`: Search/query execution model.
+- `DOCENT_LLM_REFINE_MODEL`: Agent refinement model.
+- `DOCENT_LLM_REFINEMENT_MESSAGE_MODEL`: Interactive refinement chat model.
+- `DOCENT_LLM_CLUSTER_MODEL`: Cluster proposal/synthesis model.
+- `DOCENT_LLM_CLUSTER_ASSIGN_MODEL`: Fast cluster assignment model.
+- `DOCENT_LLM_CLUSTER_ASSIGN_STRONG_MODEL`: Strong cluster assignment model.
+- `DOCENT_LLM_GENERATE_QUERIES_MODEL`: Query generation model.
+- `DOCENT_LLM_SUMMARIZE_INTENDED_SOLUTION_MODEL`: Intended-solution summary model.
 
 Each model variable can also set reasoning effort with a matching `_REASONING_EFFORT` variable. For example:
 
@@ -52,26 +65,27 @@ DOCENT_LLM_JUDGE_MODEL_REASONING_EFFORT=high
 
 Docent's embedding helper uses an OpenAI-compatible embeddings API. Hosted OpenAI remains the default, but self-hosted deployments can point embeddings at a local OpenAI-compatible server.
 
-* `DOCENT_EMBEDDING_BASE_URL`: Base URL for embedding calls.
-    * Example local value: `http://localhost:8000/v1`
-    * If unset and `DOCENT_LLM_PROVIDER=custom`, Docent reuses `DOCENT_LLM_BASE_URL`.
-    * If unset for hosted OpenAI, the OpenAI SDK default base URL is used.
-* `DOCENT_EMBEDDING_API_KEY`: API key for embedding calls.
-    * If unset and `DOCENT_LLM_PROVIDER=custom`, Docent reuses `DOCENT_LLM_API_KEY`.
-    * If unset, Docent falls back to `OPENAI_API_KEY` or `OPENAI_ADMIN_KEY`.
-    * Local servers that do not enforce auth can use a dummy value.
-* `DOCENT_EMBEDDING_MODEL`: Default embedding model.
-    * Default: `text-embedding-3-small`
-* `DOCENT_EMBEDDING_DIMENSIONS`: Embedding dimensions to request.
-    * Default: `512` for OpenAI `text-embedding-3-*` models.
-    * Use `auto`, `none`, or `null` for local models that do not accept the OpenAI `dimensions` parameter.
+- `DOCENT_EMBEDDING_BASE_URL`: Base URL for embedding calls.
+  - Manual-process example: `http://localhost:8000/v1`
+  - Docker-host example: `http://host.docker.internal:8000/v1`
+  - If unset and `DOCENT_LLM_PROVIDER=custom`, Docent reuses `DOCENT_LLM_BASE_URL`.
+  - If unset for hosted OpenAI, the OpenAI SDK default base URL is used.
+- `DOCENT_EMBEDDING_API_KEY`: API key for embedding calls.
+  - If unset and `DOCENT_LLM_PROVIDER=custom`, Docent reuses `DOCENT_LLM_API_KEY`.
+  - If unset, Docent falls back to `OPENAI_API_KEY` or `OPENAI_ADMIN_KEY`.
+  - Local servers that do not enforce auth can use a dummy value.
+- `DOCENT_EMBEDDING_MODEL`: Default embedding model.
+  - Default: `text-embedding-3-small`
+- `DOCENT_EMBEDDING_DIMENSIONS`: Embedding dimensions to request.
+  - Default: `512` for OpenAI `text-embedding-3-*` models.
+  - Use `auto`, `none`, or `null` for local models that do not accept the OpenAI `dimensions` parameter.
 
 Hodoscope can override the global embedding model without changing Docent's existing transcript embeddings:
 
-* `DOCENT_HODOSCOPE_EMBEDDING_MODEL`: Hodoscope-only embedding model.
-* `DOCENT_HODOSCOPE_EMBEDDING_DIMENSIONS`: Hodoscope-only embedding dimensions.
-* `DOCENT_HODOSCOPE_EMBEDDING_BASE_URL`: Hodoscope-only OpenAI-compatible embedding base URL.
-* `DOCENT_HODOSCOPE_EMBEDDING_API_KEY`: Hodoscope-only embedding API key. Local servers that do not enforce auth can use a dummy value.
+- `DOCENT_HODOSCOPE_EMBEDDING_MODEL`: Hodoscope-only embedding model.
+- `DOCENT_HODOSCOPE_EMBEDDING_DIMENSIONS`: Hodoscope-only embedding dimensions.
+- `DOCENT_HODOSCOPE_EMBEDDING_BASE_URL`: Hodoscope-only OpenAI-compatible embedding base URL.
+- `DOCENT_HODOSCOPE_EMBEDDING_API_KEY`: Hodoscope-only embedding API key. Local servers that do not enforce auth can use a dummy value.
 
 <Note>
 Docent's existing transcript embedding table is fixed at 512 dimensions. If your Hodoscope model does not return 512-dimensional vectors, set the Hodoscope-specific model, dimensions, base URL, and API key so global Docent embeddings can stay 512-dimensional.
@@ -85,46 +99,52 @@ For Docker Compose, edit the project root `.env` file. The backend and worker se
 
 We have provided reasonable defaults in `.env.template`, but you're welcome to customize these as needed.
 
-* `DOCENT_PG_USER`: Postgres username
-* `DOCENT_PG_PASSWORD`: Postgres password
-* `DOCENT_PG_HOST`: Postgres host
-* `DOCENT_PG_PORT`: Postgres port
-* `DOCENT_PG_DATABASE`: Postgres database (not `postgres`)
+- `DOCENT_PG_USER`: Postgres username
+- `DOCENT_PG_PASSWORD`: Postgres password
+- `DOCENT_PG_HOST`: Postgres host
+- `DOCENT_PG_PORT`: Postgres port
+- `DOCENT_PG_DATABASE`: Postgres database (not `postgres`)
+- `DOCENT_PG_POOL_SIZE`: Persistent connections per application process. Default: `5`.
+- `DOCENT_PG_MAX_OVERFLOW`: Temporary overflow connections per process. Default: `5`.
 
 ## Redis
 
 We have provided reasonable defaults in `.env.template`, but you're welcome to customize these as needed.
 
-* `DOCENT_REDIS_HOST`: Redis host
-* `DOCENT_REDIS_PORT`: Redis port
-* `DOCENT_REDIS_USER`: Redis username (optional)
-* `DOCENT_REDIS_PASSWORD`: Redis password (optional)
+- `DOCENT_REDIS_HOST`: Redis host
+- `DOCENT_REDIS_PORT`: Redis port
+- `DOCENT_REDIS_USER`: Redis username (optional)
+- `DOCENT_REDIS_PASSWORD`: Redis password (optional)
+  - The bundled Redis configures this password for its default ACL user.
+- `DOCENT_REDIS_TLS`: Whether an external Redis connection uses TLS. Default: `false`.
 
 ## Background jobs
 
-* `DOCENT_WORKER_JOB_TIMEOUT_SECONDS`: Maximum runtime for one worker job.
-    * Default: `1800` seconds (30 minutes).
-    * Large Hodoscope analyses may summarize thousands of actions. Increase this value if the configured model endpoint cannot finish within 30 minutes.
+- `DOCENT_WORKER_JOB_TIMEOUT_SECONDS`: Maximum runtime for one worker job.
+  - Default: `1800` seconds (30 minutes).
+  - Large Hodoscope analyses may summarize thousands of actions. Increase this value if the configured model endpoint cannot finish within 30 minutes.
 
 ## CORS
 
 Docent uses same-origin Web/API routing by default, so normal self-hosted browser traffic does not require CORS configuration.
 
-* `DOCENT_CORS_ORIGINS`: CSV list of allowed frontend origins for explicit cross-origin deployments (optional)
-    * Leave empty/unset for development (defaults to `localhost:*`)
-    * Example for multiple domains: `DOCENT_CORS_ORIGINS=https://app.yourdomain.com,https://admin.yourdomain.com`
+- `DOCENT_CORS_ORIGINS`: CSV list of allowed frontend origins for explicit cross-origin deployments (optional)
+  - Leave empty/unset for development (defaults to `localhost:*`)
+  - Example for multiple domains: `DOCENT_CORS_ORIGINS=https://app.yourdomain.com,https://admin.yourdomain.com`
+
+- `COOKIE_DOMAIN`: Optional shared cookie domain for deployments that intentionally span subdomains. Leave blank for same-origin deployments.
 
 ## Web and API routing
 
-* `DOCENT_INTERNAL_API_HOST`: Backend origin used by the Next.js server and its `/rest` proxy.
-    * `docent_core web --backend-url ...` and Docker Compose set this automatically.
-    * When running Bun directly, set it to the backend address reachable from the Next.js process, without a trailing `/rest`.
-* `NEXT_PUBLIC_API_HOST`: Optional public backend origin for explicit cross-origin deployments. When no internal host is set, Next.js also uses this origin for server-side requests and the `/rest` proxy. Leave it unset for the default same-origin mode.
-* `NEXT_PUBLIC_INTERNAL_API_HOST`: Deprecated compatibility alias for `DOCENT_INTERNAL_API_HOST`.
+- `DOCENT_INTERNAL_API_HOST`: Backend origin used by the Next.js server and its `/rest` proxy.
+  - `docent_core web --backend-url ...` and Docker Compose set this automatically.
+  - When running Bun directly, set it to the backend address reachable from the Next.js process, without a trailing `/rest`.
+- `NEXT_PUBLIC_API_HOST`: Optional public backend origin for explicit cross-origin deployments. When no internal host is set, Next.js also uses this origin for server-side requests and the `/rest` proxy. Leave it unset for the default same-origin mode.
+- `NEXT_PUBLIC_INTERNAL_API_HOST`: Deprecated compatibility alias for `DOCENT_INTERNAL_API_HOST`.
 
 ## Optional variables for deployed environments
 
-* `DEPLOYMENT_ID`: ID of the deployment (unset for local)
-* `SENTRY_DSN`: Sentry DSN
-* `POSTHOG_API_KEY`: PostHog API key
-* `POSTHOG_API_HOST`: PostHog API host (defaults to `https://us.i.posthog.com`)
+- `DEPLOYMENT_ID`: ID of the deployment. Leave unset for local use. When set, both `SENTRY_DSN` and `POSTHOG_API_KEY` are required.
+- `SENTRY_DSN`: Sentry DSN for a named deployment.
+- `POSTHOG_API_KEY`: PostHog API key for a named deployment.
+- `POSTHOG_API_HOST`: PostHog API host (defaults to `https://us.i.posthog.com`)

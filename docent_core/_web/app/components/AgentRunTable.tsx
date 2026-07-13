@@ -391,7 +391,8 @@ export const AgentRunTable = memo(function AgentRunTable({
           if (columnKey.startsWith('metadata.')) {
             // For metadata columns, try to access from the structured metadata first
             const structured = processedData?._structured as
-              Record<string, unknown> | undefined;
+              | Record<string, unknown>
+              | undefined;
             if (
               structured?.metadata &&
               typeof structured.metadata === 'object'
@@ -554,7 +555,9 @@ export const AgentRunTable = memo(function AgentRunTable({
     posthog.capture('agent_run_table_columns_clear_all', {
       collectionId,
     });
-  }, [onSelectedColumnsChange]);
+
+    onSelectedColumnsChange([]);
+  }, [collectionId, onSelectedColumnsChange]);
 
   // Sort controls handlers
   const handleFieldChange = useCallback(

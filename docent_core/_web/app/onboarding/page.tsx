@@ -35,6 +35,7 @@ import { apiRestClient } from '@/app/services/apiService';
 import { useLocale } from '@/app/contexts/LocaleContext';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import type { MessageKey } from '@/lib/i18n/messages';
+import { safeInternalRedirect } from '@/lib/safe-internal-redirect.mjs';
 
 interface OnboardingOption {
   id: string;
@@ -103,7 +104,7 @@ export default function OnboardingPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t } = useLocale();
-  const redirectParam = searchParams.get('redirect') || '';
+  const redirectParam = safeInternalRedirect(searchParams.get('redirect'));
   const stepParam = searchParams.get('step');
   const [currentStep, setCurrentStep] = useState(
     stepParam ? parseInt(stepParam) : 1
@@ -245,8 +246,7 @@ client.add_agent_runs(collection_id, [agent_run])`;
         title: t('onboarding.toast.welcomeTitle'),
         description: t('onboarding.toast.welcomeDescription'),
       });
-      const redirectUrl = redirectParam || '/dashboard';
-      router.push(redirectUrl);
+      router.push(redirectParam || '/dashboard');
     } catch (error) {
       console.error('Failed to complete onboarding:', error);
       toast({
