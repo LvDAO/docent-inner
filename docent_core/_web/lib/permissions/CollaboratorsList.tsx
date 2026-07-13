@@ -13,6 +13,7 @@ import {
   useUpsertCollaboratorMutation,
 } from './collabSlice';
 import { Button } from '@/components/ui/button';
+import { useLocale } from '@/app/contexts/LocaleContext';
 import { useRequireUserContext } from '@/app/contexts/UserContext';
 import { useHasCollectionAdminPermission } from './hooks';
 
@@ -35,12 +36,15 @@ const getInitials = (name?: string, email?: string) => {
 };
 
 const getDisplayName = (
-  collaborator: UserCollaborator | OrganizationCollaborator
+  collaborator: UserCollaborator | OrganizationCollaborator,
+  unknownLabel: string
 ) => {
   if (collaborator.subject_type === 'user') {
-    return collaborator.subject.name || collaborator.subject.email || 'Unknown';
+    return (
+      collaborator.subject.name || collaborator.subject.email || unknownLabel
+    );
   }
-  return collaborator.subject.name || 'Unknown';
+  return collaborator.subject.name || unknownLabel;
 };
 
 // Collaborator Row Component
@@ -48,6 +52,7 @@ interface CollaboratorRowProps {
   collaborator: UserCollaborator | OrganizationCollaborator;
 }
 const CollaboratorRow = ({ collaborator }: CollaboratorRowProps) => {
+  const { t } = useLocale();
   const [upsertCollaborator] = useUpsertCollaboratorMutation();
   const [removeCollaborator] = useRemoveCollaboratorMutation();
   const hasAdminPermission = useHasCollectionAdminPermission();
@@ -73,14 +78,18 @@ const CollaboratorRow = ({ collaborator }: CollaboratorRowProps) => {
         return <User size={14} />;
     }
   };
-  const displayName = getDisplayName(collaborator);
+  const displayName = getDisplayName(collaborator, t('permissions.unknown'));
   const displayEmail =
     collaborator.subject_type === 'user'
       ? collaborator.subject.email
       : undefined;
 
   return (
-    <div className={cn('flex items-center justify-between')}>
+    <div
+      className={cn(
+        'flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'
+      )}
+    >
       <div className="flex items-center gap-3 flex-1 min-w-0">
         <Avatar className="h-7 w-8">
           <AvatarFallback className="text-xs">
@@ -102,14 +111,18 @@ const CollaboratorRow = ({ collaborator }: CollaboratorRowProps) => {
           {collaborator.subject_type !== 'user' && (
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
               {getSubjectIcon(collaborator.subject_type)}
-              <span className="capitalize">{collaborator.subject_type}</span>
+              <span>
+                {collaborator.subject_type === 'organization'
+                  ? t('permissions.organization')
+                  : t('permissions.public')}
+              </span>
             </div>
           )}
         </div>
       </div>
 
       {/* Permission Dropdown and Actions */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 self-end sm:self-auto">
         <PermissionDropdown
           value={collaborator.permission_level}
           onChange={(newPermission) => onPermissionChange(newPermission)}
@@ -118,6 +131,9 @@ const CollaboratorRow = ({ collaborator }: CollaboratorRowProps) => {
           variant="ghost"
           size="sm"
           disabled={!hasAdminPermission}
+          aria-label={t('permissions.removeCollaborator', {
+            name: displayName,
+          })}
           onClick={() =>
             removeCollaborator({
               subject_id: collaborator.subject_id,
@@ -139,6 +155,7 @@ interface CollaboratorsListProps {
 }
 
 const CollaboratorsList = ({ collectionId }: CollaboratorsListProps) => {
+  const { t } = useLocale();
   const { user: currentUser } = useRequireUserContext();
   const { userCollaborators, orgCollaborators } = useGetCollaboratorsQuery(
     collectionId,
@@ -147,37 +164,42 @@ const CollaboratorsList = ({ collectionId }: CollaboratorsListProps) => {
         return {
           userCollaborators: result.data?.filter(
             (c) => c.subject_type === 'user' && c.subject_id !== currentUser.id
-          ) as UserCollaborator[],
+          ) as UserCollaborator[] | undefined,
           orgCollaborators: result.data?.filter(
             (c) => c.subject_type === 'organization'
-          ) as OrganizationCollaborator[],
+          ) as OrganizationCollaborator[] | undefined,
         };
       },
     }
   );
 
-  if (!userCollaborators?.length && !orgCollaborators?.length) {
+  const users = userCollaborators ?? [];
+  const organizations = orgCollaborators ?? [];
+
+  if (users.length === 0 && organizations.length === 0) {
     return (
       <div className="text-center py-6 text-muted-foreground">
         <User className="mx-auto h-7 w-8 mb-2 opacity-50" />
-        <p className="text-xs">No collaborators yet</p>
+        <p className="text-xs">{t('permissions.noCollaborators')}</p>
       </div>
     );
   }
 
+  const collaboratorCount = users.length + organizations.length;
+
   return (
     <div className="space-y-1">
       <h3 className="text-sm font-semibold">
-        Collaborators ({userCollaborators?.length})
+        {t('permissions.collaborators', { count: collaboratorCount })}
       </h3>
 
-      {userCollaborators.map((collaborator) => (
+      {users.map((collaborator) => (
         <CollaboratorRow
           key={`${collaborator.subject_id}-${collaborator.subject_type}-${collaborator.collection_id}`}
           collaborator={collaborator}
         />
       ))}
-      {orgCollaborators.map((collaborator) => (
+      {organizations.map((collaborator) => (
         <CollaboratorRow
           key={`${collaborator.subject_id}-${collaborator.subject_type}-${collaborator.collection_id}`}
           collaborator={collaborator}

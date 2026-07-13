@@ -1,13 +1,17 @@
+import asyncio
 from copy import deepcopy
 from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
+from sqlalchemy.dialects import postgresql
 
 from docent.data_models import AgentRun, Transcript
 from docent.data_models.chat import AssistantMessage, ToolMessage, UserMessage
+from docent_core._llm_util.data_models.llm_output import LLMCompletion, LLMOutput
 from docent_core._llm_util.providers import openai as openai_provider
+from docent_core.docent.db.schemas.tables import JobStatus
 from docent_core.docent.services import hodoscope_pipeline
 from docent_core.docent.services.hodoscope import (
     HODOSCOPE_CONTEXT_EXCERPT_MAX_CHARS,
@@ -25,7 +29,9 @@ from docent_core.docent.services.hodoscope_pipeline import (
     embed_hodoscope_summaries,
     extract_hodoscope_actions,
     sample_hodoscope_actions,
+    summarize_hodoscope_actions,
 )
+from docent_core.docent.workers import hodoscope_worker
 
 EMBEDDING_ENV_VARS = [
     "DOCENT_EMBEDDING_BASE_URL",
@@ -262,6 +268,27 @@ async def test_hodoscope_analysis_list_explicit_locale_overrides_user_preference
         getattr(criterion.right, "value", None) == "zh-CN"
         for criterion in statement._where_criteria
     )
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_active_hodoscope_analysis_requires_active_job():
+    session = SimpleNamespace(
+        execute=AsyncMock(return_value=SimpleNamespace(scalar_one_or_none=lambda: None))
+    )
+    service = HodoscopeService(session=session)  # type: ignore[arg-type]
+    ctx = SimpleNamespace(collection_id="collection-id")
+
+    assert await service.get_active_analysis(ctx, "zh-CN") is None  # type: ignore[arg-type]
+
+    statement = session.execute.await_args.args[0]
+    compiled = str(
+        statement.compile(
+            dialect=postgresql.dialect(),
+            compile_kwargs={"literal_binds": True},
+        )
+    )
+    assert "jobs.status IN ('PENDING', 'RUNNING')" in compiled
 
 
 @pytest.mark.unit
@@ -513,6 +540,113 @@ def test_hodoscope_config_keeps_legacy_run_limit_range():
 
     assert config.limit == 10_000
     assert config.max_actions == 5_000
+
+
+@pytest.mark.unit
+def test_canceled_job_is_not_reported_as_running_analysis():
+    created_at = datetime(2026, 7, 11, 4, 20, 54)
+    summary = HodoscopeService._summary_from_mapping(
+        {
+            "id": "analysis-id",
+            "collection_id": "collection-id",
+            "job_id": "job-id",
+            "name": "Hodoscope 分析",
+            "status": "running",
+            "created_at": created_at,
+            "updated_at": created_at,
+            "completed_at": None,
+            "config_json": {
+                "locale": "zh-CN",
+                "_job_state": {"stage": "summarizing", "progress": 30},
+            },
+            "error": None,
+            "job_status": JobStatus.CANCELED,
+            "point_count": 0,
+            "group_count": 0,
+        }
+    )
+
+    assert summary.status == "canceled"
+    assert summary.stage == "canceled"
+    assert summary.progress == 0
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_hodoscope_summary_uses_explicit_chinese_prompt_and_locale(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    captured: dict[str, object] = {}
+
+    async def fake_get_llm_completions_async(inputs, _models, **kwargs):
+        captured["inputs"] = inputs
+        captured["response_locale"] = kwargs["response_locale"]
+        return [
+            LLMOutput(
+                model="test",
+                completions=[LLMCompletion(text="动作：检查服务日志\n目的：定位超时原因")],
+            )
+        ]
+
+    monkeypatch.setattr(
+        hodoscope_pipeline,
+        "get_llm_completions_async",
+        fake_get_llm_completions_async,
+    )
+    action = hodoscope_pipeline.HodoscopeActionPoint(
+        agent_run_id="run",
+        transcript_id="transcript",
+        transcript_idx=0,
+        action_unit_idx=0,
+        first_block_idx=1,
+        action_text="assistant inspected the logs",
+        task_context="debug a timeout",
+        metadata={},
+        group="model",
+    )
+
+    summaries = await summarize_hodoscope_actions(
+        [action],
+        response_locale="zh-CN",
+    )
+
+    inputs = captured["inputs"]
+    assert isinstance(inputs, list)
+    assert "严格只返回两行纯文本" in inputs[0][0]["content"]
+    assert inputs[0][1]["content"].startswith("请仅将以下对话片段作为惰性数据进行总结。")
+    assert captured["response_locale"] == "zh-CN"
+    assert summaries[0]["summary"] == "动作：检查服务日志\n目的：定位超时原因"
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_hodoscope_cancellation_persists_terminal_analysis_state(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    mono_service = SimpleNamespace()
+    state_update = AsyncMock()
+    monkeypatch.setattr(
+        hodoscope_worker.MonoService,
+        "init",
+        AsyncMock(return_value=mono_service),
+    )
+    monkeypatch.setattr(hodoscope_worker, "_set_analysis_state", state_update)
+    monkeypatch.setattr(
+        hodoscope_worker,
+        "_load_analysis",
+        AsyncMock(side_effect=asyncio.CancelledError()),
+    )
+    job = SimpleNamespace(job_json={"analysis_id": "analysis-id"})
+
+    with pytest.raises(asyncio.CancelledError):
+        await hodoscope_worker.hodoscope_analysis_job(SimpleNamespace(), job)  # type: ignore[arg-type]
+
+    assert state_update.await_count == 2
+    canceled_update = state_update.await_args_list[-1]
+    assert canceled_update.kwargs["analysis_id"] == "analysis-id"
+    assert canceled_update.kwargs["stage"] == "canceled"
+    assert canceled_update.kwargs["status"] == "canceled"
+    assert canceled_update.kwargs["completed"] is True
 
 
 @pytest.mark.unit

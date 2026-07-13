@@ -142,7 +142,7 @@ export const onboardingZhCN = {
   'onboarding.code.userGreeting': '你好',
   'onboarding.code.assistantGreeting': '你好！',
   'onboarding.code.upload': '上传到 Docent',
-  'onboarding.progress': '第 {current} 步，共 {total} 步',
+  'onboarding.progress': '步骤 {current}/{total}',
   'onboarding.navigation.back': '返回',
   'onboarding.navigation.complete': '完成设置',
   'onboarding.navigation.continue': '继续',

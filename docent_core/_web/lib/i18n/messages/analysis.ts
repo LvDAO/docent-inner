@@ -352,7 +352,7 @@ export const analysisZhCN = {
   'analysis.hodoscope.map.hideCategory': '隐藏 {category}',
   'analysis.hodoscope.map.showCategory': '显示 {category}',
   'analysis.hodoscope.map.updating': '正在更新地图…',
-  'analysis.hodoscope.map.visibleCount': '显示 {visible} / {total} 个',
+  'analysis.hodoscope.map.visibleCount': '显示 {visible}/{total} 个',
   'analysis.hodoscope.map.ariaLabel':
     '{method} 嵌入图，当前显示 {count} 个动作。使用方向键查看各点，按 Enter 打开所选运行，按 0 使地图适应视图。',
   'analysis.hodoscope.map.selectedAction':
@@ -361,8 +361,7 @@ export const analysisZhCN = {
     '所选动作已被当前筛选条件隐藏：{summary}。当前显示 {count} 个动作。',
   'analysis.hodoscope.map.noActionSelected':
     '未选择动作。当前显示 {count} 个动作。',
-  'analysis.hodoscope.path.coverageKnown':
-    '已投影 {projected} 个 / 共 {total} 个',
+  'analysis.hodoscope.path.coverageKnown': '已投影 {projected}/{total}',
   'analysis.hodoscope.path.coverageUnknownTotal':
     '已投影 {projected} 个 · 总数未知',
   'analysis.hodoscope.path.completeNotice': '此已投影运行包含完整的动作覆盖。',
@@ -373,7 +372,7 @@ export const analysisZhCN = {
   'analysis.hodoscope.path.a11yDescription':
     '已显示所选运行路径，覆盖情况：{coverage}。',
   'analysis.hodoscope.inspector.title': '动作检查器',
-  'analysis.hodoscope.inspector.subtitle': '浏览时保持当前选择',
+  'analysis.hodoscope.inspector.subtitle': '保持当前选择',
   'analysis.hodoscope.inspector.previousPathAction':
     '选择此运行路径中的上一个动作',
   'analysis.hodoscope.inspector.previousVisibleAction': '选择上一个可见动作',
@@ -382,17 +381,17 @@ export const analysisZhCN = {
   'analysis.hodoscope.inspector.task': '任务',
   'analysis.hodoscope.inspector.transcript': '对话记录',
   'analysis.hodoscope.inspector.transcriptAction':
-    '第 {transcript} 份 · 第 {action} 个动作',
+    '对话 {transcript} · 动作 {action}',
   'analysis.hodoscope.inspector.exception': '异常',
   'analysis.hodoscope.path.title': '运行路径',
-  'analysis.hodoscope.path.stepCount': '第 {step} 步，共 {count} 步',
+  'analysis.hodoscope.path.stepCount': '步骤 {step}/{count}',
   'analysis.hodoscope.path.notInOrderedPath': '所选动作不在有序路径中',
   'analysis.hodoscope.path.complete': '完整',
   'analysis.hodoscope.path.sampled': '已抽样',
   'analysis.hodoscope.path.coverageUnknown': '覆盖范围未知',
   'analysis.hodoscope.path.hide': '隐藏路径',
   'analysis.hodoscope.path.show': '显示路径',
-  'analysis.hodoscope.openSourceRun': '打开源运行',
+  'analysis.hodoscope.openSourceRun': '打开原始运行记录',
   'analysis.hodoscope.representatives.title': '代表动作',
   'analysis.hodoscope.representatives.fpsDiversity': 'FPS 多样性样本',
   'analysis.hodoscope.representatives.fpsRank': 'FPS {rank}',
@@ -411,11 +410,11 @@ export const analysisZhCN = {
   'analysis.summary.mistake': '错误',
   'analysis.summary.criticalInsight': '关键洞察',
   'analysis.summary.nearMiss': '接近正确',
-  'analysis.summary.interestingBehavior': '有趣行为',
+  'analysis.summary.interestingBehavior': '值得关注的行为',
   'analysis.summary.cheating': '作弊',
   'analysis.summary.actionUnit': '动作单元 {index}',
   'analysis.summary.actionUnitObservation':
-    '动作单元 {index}：{label} - {description}',
+    '动作 {index}：{label}；{description}',
   'analysis.summary.subSteps': '{count} 个子步骤',
   'analysis.summary.containsObservation': '包含：{label}',
   'analysis.summary.moreInterestingMoments': '更多值得关注的时刻',
@@ -424,7 +423,7 @@ export const analysisZhCN = {
   'analysis.summary.actionsDescription':
     '点击动作可查看值得关注之处的分析；展开区块可查看详细步骤。',
   'analysis.summary.failedTranscript': '无法分析此对话记录',
-  'analysis.summary.additionalLowLevelActions': '其他底层动作',
+  'analysis.summary.additionalLowLevelActions': '其他细分动作',
   'analysis.summary.noActions': '此智能体运行没有可用动作。',
 
   'analysis.viewer.agentRun': '智能体运行',
@@ -450,7 +449,7 @@ export const analysisZhCN = {
   'analysis.navigator.fullTree': '完整树',
   'analysis.navigator.expandAllGroups': '展开所有分组',
   'analysis.navigator.collapseAllGroups': '折叠所有分组',
-  'analysis.navigator.transcriptGroupMetadata': '对话记录分组元数据 - {name}',
+  'analysis.navigator.transcriptGroupMetadata': '对话记录分组元数据：{name}',
   'analysis.navigator.viewTranscriptGroupMetadata': '查看对话记录分组元数据',
   'analysis.navigator.viewTranscriptMetadata': '查看对话记录元数据',
 
@@ -468,12 +467,12 @@ export const analysisZhCN = {
   'analysis.rubric.runEvaluation': '使用此评估准则运行评估',
   'analysis.rubric.delete': '删除此评估准则',
   'analysis.rubric.saved': '已保存的评估准则',
-  'analysis.rubric.savedDescription': '运行和修改之前创建的评估准则',
+  'analysis.rubric.savedDescription': '运行或修改已有评估准则',
   'analysis.rubric.none': '尚未创建评估准则',
 
   'analysis.editor.noChanges': '与上一版本相比没有变化',
   'analysis.editor.title': '评估准则编辑器',
-  'analysis.editor.evaluationTitle': '评估准则评估',
+  'analysis.editor.evaluationTitle': '准则评估',
   'analysis.editor.description': '编写评估准则。',
   'analysis.editor.evaluationDescription': '查看评估准则结果。',
   'analysis.editor.showDiff': '显示差异',
@@ -489,7 +488,7 @@ export const analysisZhCN = {
   'analysis.editor.unknownError': '未知错误',
 
   'analysis.run.starting': '正在启动评估…',
-  'analysis.run.run': '运行评估准则',
+  'analysis.run.run': '开始评估',
   'analysis.run.stopping': '正在停止评估…',
   'analysis.run.stop': '停止评估',
   'analysis.run.latestVersionRequired': '请切换到最新版本后再运行。',

@@ -100,6 +100,12 @@ We have provided reasonable defaults in `.env.template`, but you're welcome to c
 * `DOCENT_REDIS_USER`: Redis username (optional)
 * `DOCENT_REDIS_PASSWORD`: Redis password (optional)
 
+## Background jobs
+
+* `DOCENT_WORKER_JOB_TIMEOUT_SECONDS`: Maximum runtime for one worker job.
+    * Default: `1800` seconds (30 minutes).
+    * Large Hodoscope analyses may summarize thousands of actions. Increase this value if the configured model endpoint cannot finish within 30 minutes.
+
 ## CORS
 
 Docent uses same-origin Web/API routing by default, so normal self-hosted browser traffic does not require CORS configuration.

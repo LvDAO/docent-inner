@@ -33,25 +33,6 @@ function SignupPageContent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [carouselApi, setCarouselApi] = useState<CarouselApi | null>(null);
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [totalSlides, setTotalSlides] = useState(0);
-
-  useEffect(() => {
-    if (!carouselApi) return;
-
-    const update = () => {
-      setCurrentSlide(carouselApi.selectedScrollSnap());
-      setTotalSlides(carouselApi.scrollSnapList().length);
-    };
-
-    update();
-    carouselApi.on('select', update);
-    carouselApi.on('reInit', update);
-
-    return () => {
-      carouselApi.off('select', update);
-      carouselApi.off('reInit', update);
-    };
-  }, [carouselApi]);
 
   const videoItems = [
     {
@@ -95,6 +76,24 @@ function SignupPageContent() {
     },
   ];
 
+  useEffect(() => {
+    if (!carouselApi) return;
+
+    const update = () => {
+      setCurrentSlide(carouselApi.selectedScrollSnap());
+    };
+
+    carouselApi.on('select', update);
+    carouselApi.on('reInit', update);
+    carouselApi.reInit();
+    update();
+
+    return () => {
+      carouselApi.off('select', update);
+      carouselApi.off('reInit', update);
+    };
+  }, [carouselApi]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -132,11 +131,11 @@ function SignupPageContent() {
 
   return (
     <div className="h-screen flex flex-col lg:flex-row overflow-y-auto">
-      <div className="absolute right-4 top-4 z-10">
-        <LanguageSwitcher />
-      </div>
       <div className="flex-1 flex items-center justify-center">
         <div className="py-8 px-4 max-w-md flex-1 space-y-6">
+          <div className="flex justify-end">
+            <LanguageSwitcher />
+          </div>
           {/* Header */}
           <div className="text-center space-y-2">
             <h1 className="text-2xl font-bold tracking-tight">
@@ -297,7 +296,7 @@ function SignupPageContent() {
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <div className="text-xs text-muted-foreground">
-              {currentSlide + 1} / {totalSlides}
+              {currentSlide + 1} / {videoItems.length}
             </div>
             <Button
               type="button"

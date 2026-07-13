@@ -58,6 +58,14 @@ def test_actions_summary_payload_uses_canonical_transcript_order():
 
 
 @pytest.mark.unit
+def test_actions_summary_explicit_locale_overrides_user_preference():
+    user = type("User", (), {"preferred_locale": "en"})()
+
+    assert router._resolve_requested_response_locale("zh-CN", user) == "zh-CN"
+    assert router._resolve_requested_response_locale(None, user) == "en"
+
+
+@pytest.mark.unit
 @pytest.mark.asyncio
 async def test_transcript_summary_failure_marks_only_failed_transcript(monkeypatch):
     early = _transcript("early", "Early", datetime(2024, 1, 1))

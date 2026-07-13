@@ -890,12 +890,18 @@ class HodoscopeService:
         job_state = cast(dict[str, Any], job_state_raw) if isinstance(job_state_raw, dict) else {}
         stage_raw: object = job_state.get("stage")
         progress_raw: object = job_state.get("progress")
+        status = cast(HodoscopeAnalysisStatus, row["status"])
+        job_status = row.get("job_status")
+        if status in {"pending", "running"} and job_status == JobStatus.CANCELED:
+            status = "canceled"
+            stage_raw = "canceled"
+            progress_raw = 0
         return HodoscopeAnalysisSummary(
             id=row["id"],
             collection_id=row["collection_id"],
             job_id=row["job_id"],
             name=row["name"],
-            status=row["status"],
+            status=status,
             created_at=row["created_at"],
             updated_at=row["updated_at"],
             completed_at=row["completed_at"],
@@ -910,6 +916,12 @@ class HodoscopeService:
     @staticmethod
     def _summary_columns() -> tuple[Any, ...]:
         projection = SQLAHodoscopeAnalysis.projection_json
+        job_status = (
+            select(SQLAJob.status)
+            .where(SQLAJob.id == SQLAHodoscopeAnalysis.job_id)
+            .correlate(SQLAHodoscopeAnalysis)
+            .scalar_subquery()
+        )
         return (
             SQLAHodoscopeAnalysis.id,
             SQLAHodoscopeAnalysis.collection_id,
@@ -921,6 +933,7 @@ class HodoscopeService:
             SQLAHodoscopeAnalysis.completed_at,
             SQLAHodoscopeAnalysis.config_json,
             SQLAHodoscopeAnalysis.error,
+            job_status.label("job_status"),
             func.coalesce(func.jsonb_array_length(projection["points"]), 0).label("point_count"),
             func.coalesce(func.jsonb_array_length(projection["groups"]), 0).label("group_count"),
         )
@@ -985,6 +998,11 @@ class HodoscopeService:
                     DEFAULT_LOCALE,
                 )
                 == locale,
+                SQLAHodoscopeAnalysis.job_id.in_(
+                    select(SQLAJob.id).where(
+                        SQLAJob.status.in_([JobStatus.PENDING, JobStatus.RUNNING])
+                    )
+                ),
             )
             .order_by(SQLAHodoscopeAnalysis.created_at.desc())
             .limit(1)

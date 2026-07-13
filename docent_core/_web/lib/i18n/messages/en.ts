@@ -200,6 +200,40 @@ export const en = {
   'collections.edit': 'Edit collection',
   'collections.delete': 'Delete collection',
   'collections.readOnly': 'Read only',
+
+  'permissions.readWrite': 'Read-write',
+  'permissions.share': 'Share',
+  'permissions.addCollaborators': 'Add collaborators',
+  'permissions.noManagePermission':
+    'You do not have permission to add or edit collaborators.',
+  'permissions.emailPlaceholder': 'Enter email address',
+  'permissions.noAddPermission':
+    "You don't have permission to add collaborators",
+  'permissions.invite': 'Invite',
+  'permissions.lookupFailed': 'Failed to look up user. Please try again.',
+  'permissions.userNotFound': 'User not found',
+  'permissions.userNotFoundDescription':
+    'No user found with email address: {email}',
+  'permissions.cannotInviteSelf': 'You cannot invite yourself.',
+  'permissions.inviteFailed': 'Failed to invite user. Please try again.',
+  'permissions.publicAccess': 'Public access',
+  'permissions.publicAccessDescription': 'Anyone with the link can access',
+  'permissions.noAccess': 'No access',
+  'permissions.canView': 'Can view',
+  'permissions.canEdit': 'Can edit',
+  'permissions.fullAccess': 'Full access',
+  'permissions.viewDescription': 'View runs and searches',
+  'permissions.editDescription': 'Add or remove runs and perform searches',
+  'permissions.adminDescription': 'Manage sharing and delete the collection',
+  'permissions.publicNoneDescription': 'Only invited people can access',
+  'permissions.publicViewDescription': 'Anyone with the link can view',
+  'permissions.publicEditDescription': 'Anyone with the link can edit',
+  'permissions.noCollaborators': 'No collaborators yet',
+  'permissions.collaborators': 'Collaborators ({count})',
+  'permissions.unknown': 'Unknown',
+  'permissions.organization': 'Organization',
+  'permissions.public': 'Public',
+  'permissions.removeCollaborator': 'Remove {name}',
 } as const;
 
 export type MessageKey = keyof typeof en;

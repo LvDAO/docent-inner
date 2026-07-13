@@ -74,7 +74,7 @@ function LoginPageContent() {
   return (
     <ScrollArea className="h-screen">
       <div className="container mx-auto py-8 px-4 max-w-md">
-        <div className="absolute top-4 right-4 flex items-center gap-2">
+        <div className="mb-6 flex items-center justify-end gap-2">
           <LanguageSwitcher />
           <ModeToggle />
         </div>

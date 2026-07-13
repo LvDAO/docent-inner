@@ -1441,7 +1441,7 @@ export function HodoscopeEmbeddingMap({
               />
               <span className="truncate font-medium">{hoveredPoint.group}</span>
             </div>
-            <p className="line-clamp-3 leading-relaxed text-muted-foreground">
+            <p className="line-clamp-3 whitespace-pre-line break-words leading-relaxed text-muted-foreground">
               {hoveredPoint.summary}
             </p>
             {hoveredPointTags.length > 0 ? (
@@ -1554,7 +1554,7 @@ export function HodoscopeEmbeddingMap({
                   })}
                 </span>
               </div>
-              <h3 className="text-sm font-semibold leading-snug">
+              <h3 className="whitespace-pre-line break-words text-sm font-semibold leading-snug">
                 {selectedPoint.summary}
               </h3>
               {selectedPoint.context_excerpt ? (
@@ -1787,7 +1787,7 @@ export function HodoscopeEmbeddingMap({
                       }}
                     />
                     <span className="min-w-0 flex-1">
-                      <span className="line-clamp-2 leading-snug">
+                      <span className="line-clamp-2 whitespace-pre-line break-words leading-snug">
                         {point.summary}
                       </span>
                       <span className="mt-1 block text-[10px] text-muted-foreground">

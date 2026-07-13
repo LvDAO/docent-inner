@@ -60,29 +60,21 @@ export function LocaleProvider({
   const setLocale = useCallback(
     async (nextLocale: Locale) => {
       const normalizedLocale = normalizeLocale(nextLocale);
-      const previousLocale = locale;
-      setLocaleState(normalizedLocale);
-      document.documentElement.lang = normalizedLocale;
-      document.cookie = `${LOCALE_COOKIE_NAME}=${encodeURIComponent(normalizedLocale)}; path=/; max-age=31536000; samesite=lax`;
-
-      if (!user || user.preferred_locale === normalizedLocale) {
-        return;
-      }
-
-      try {
+      if (user && user.preferred_locale !== normalizedLocale) {
         const updatedUser = await updatePreferredLocale(normalizedLocale);
         setUser({
           ...updatedUser,
           preferred_locale: normalizedLocale,
         } satisfies User);
-      } catch (error) {
-        setLocaleState(previousLocale);
-        document.documentElement.lang = previousLocale;
-        document.cookie = `${LOCALE_COOKIE_NAME}=${encodeURIComponent(previousLocale)}; path=/; max-age=31536000; samesite=lax`;
-        throw error;
       }
+
+      // Publish the new client locale only after the account preference is durable.
+      // This keeps locale-sensitive requests from racing the preference update.
+      setLocaleState(normalizedLocale);
+      document.documentElement.lang = normalizedLocale;
+      document.cookie = `${LOCALE_COOKIE_NAME}=${encodeURIComponent(normalizedLocale)}; path=/; max-age=31536000; samesite=lax`;
     },
-    [locale, setUser, user]
+    [setUser, user]
   );
 
   const t = useCallback(
